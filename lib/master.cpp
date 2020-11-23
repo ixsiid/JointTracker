@@ -38,7 +38,7 @@ struct JointList_s {
 };
 
 Joint_s right_leg[3] = {
-    {0, {0.12f, -0.04f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // hip
+    {0, {0.12f, -0.04f, 0.13f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // hip
     {8, {0.00f, -0.38f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // nee
     {9, {0.00f, -0.48f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // ankle
 };
@@ -74,7 +74,8 @@ void setup() {
 	M5.Lcd.print("Done");
 
 	osc	    = new OscClient(Config::vmt_host, Config::vmt_port);
-	osc_args = {1.0f, 0.0f, 0.0f, 0.0f,		 // qw, qz, qy, qx
+	osc_args = {Config::root_tracker_serial,      // Serial
+		       1.0f, 0.0f, 0.0f, 0.0f,		 // qw, qz, qy, qx
 			  0.0f, 1.0f, 0.0f,				 // z, y, x
 			  0.0f, 1, Config::tracker_index};	 // time, enable, index
 }
@@ -83,8 +84,9 @@ uint8_t cmd[1] = {0};
 
 void loop() {
 	// これはトラッカーから得る情報
-	Vector3<float> hip	 = {0.0f, 0.95f, 0.0f};
-	Quaternion tracker_q = Quaternion::identify();
+	Vector3<float> hip	 = {0.0f, 0.0f, 0.0f};
+	float theta = 2.0f / 360.0f * 2.0f * 3.1415f;
+	Quaternion tracker_q = {sinf(theta), 0.0f, 0.0f, cosf(theta)};
 
 	Vector3<float> pos = hip;
 
