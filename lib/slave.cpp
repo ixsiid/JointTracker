@@ -17,7 +17,7 @@
 #define CONFIG_I2C_SLAVE_PORT_NUM ((i2c_port_t)1)
 #define CONFIG_I2C_SLAVE_SDA ((gpio_num_t)26)
 #define CONFIG_I2C_SLAVE_SCL ((gpio_num_t)32)
-#define CONFIG_I2C_SLAVE_ADDRESS ((uint8_t)0x09)
+#define CONFIG_I2C_SLAVE_ADDRESS ((uint8_t)0x08)
 
 #define RX_BUFFER_LENGTH ((size_t)512)
 
@@ -100,8 +100,11 @@ static void data_update(void *arg) {
 			set_neutral_quaternion = false;
 
 			p = ahrs->q.inverse();
+			ay = Quaternion::identify();
 		} else if (set_z_direction) {
 			set_z_direction = false;
+
+			/*
 			// {0, -1, 0} を回転させた結果が {0, 0, -1}となるようにY軸回転を加える
 			// {0, 0, -1} はビートセイバーのスタート画面が表示される方向
 			Vector3<float> av = {-2.0f * (q.x * q.y - q.w * q.z),
@@ -111,6 +114,19 @@ static void data_update(void *arg) {
 			float theta = atan2f(av.x, -av.z);
 
 			ay = {0.0f, sinf(theta), 0.0f, cosf(theta)};
+			*/
+
+			Quaternion dq = ahrs->q * p;
+			// 正規化する
+			Vector3<float> dv = {dq.x, dq.y, dq.z};
+			dq.w = 1.0f / sqrtf(2.0f);
+			dv *= dq.w / sqrtf(dv.Dot2());
+			dq.x = dv.x;
+			dq.y = dv.y;
+			dq.z = dv.z;
+			
+			Quaternion correct = {dq.w, 0.0f, 0.0f, dq.w}; // X軸に90°のQuaternionがキャリブレーション後の結果
+			ay = (p.inverse() * correct) * p * dq.inverse();
 		} else {
 			calib->getAccelAdc(&a);
 			calib->getGyroAdc(&g);
@@ -130,12 +146,15 @@ static void data_update(void *arg) {
 			if (max_a < -a.z) max_a = -a.z;
 
 			ahrs->update(g * s, a * t);
-			q = p * ahrs->q;
+			Quaternion dq = ahrs->q * p;
+			q = p * ((ay * dq) * p.inverse());
+			// q = p * (ay * ahrs->q);
+
+
 			// SteamVR上に座標系を変換
 			q = {-q.x, -q.y, q.z, q.w};
 
-			// Y軸周りを調整して送信バッファに保存
-			data.q = ay * q;
+			data.q = q;
 		}
 	}
 }
@@ -154,92 +173,3 @@ void app_main() {
 	xTaskCreate(i2c_slave_task, "i2c_test_task_0", 1024 * 2, slave, 10, NULL);
 	xTaskCreate(data_update, "update_ahrs", 1024 * 2, imu, 10, NULL);
 }
-
-/*
-
-#include <BLEDevice.h>
-#include <M5Atom.h>
-#include <Wire.h>
-#include <WireSlave.h>
-
-#include "data.h"
-
-#define DEVICE_NAME "Lower Tracker Branch"
-
-#define SDA_PIN 26
-#define SCL_PIN 32
-#define I2C_SLAVE_ADDR 0x08
-
-void onI2CRequest();
-void onI2CReceive(int);
-
-data_u data;
-uint8_t z = 0;
-
-BLEServer* server;
-BLEAdvertising* adv;
-
-uint8_t seq = 0;
-
-void setup() {
-	M5.begin(true, false, true);
-	data.x = 0.1f;
-	data.y = -0.5f;
-	data.z = 1.2f;
-
-	M5.dis.clear();
-	M5.dis.drawpix(0, 0, HUE_GREEN);
-
-	BLEDevice::init(DEVICE_NAME);
-	server = BLEDevice::createServer();
-	adv	  = server->getAdvertising();
-
-	BLEAdvertisementData d = BLEAdvertisementData();
-	d.setFlags(0x06);
-	std::string payload = "";
-	payload += (char)(4 + sizeof(data_u));
-	payload += (char)0xff;  // Advertise Data Type: 0xff, Manufacturer specific data
-	payload += (char)0xff;  // Manufacture ID (Low)
-	payload += (char)0xff;  // Manufacture ID (High)
-	payload += (char)seq;   // シーケンス番号
-	for (int i = 0; i < sizeof(data_u); i++) payload += (char)data.raw[i];
-	d.addData(payload);
-	seq++;
-	adv->setAdvertisementData(d);
-	adv->start();
-
-	Serial.printf("Start Lower Tracker Branch, %p\n", server);
-}
-
-int t = 0;
-
-void loop() {
-	delay(40);
-	adv->stop();
-
-	if (t++ > 50) {
-		t = 0;
-		data.x += 0.2f;
-	}
-	if (t == 20) {
-		data.y -= 0.4f;
-	}
-	if (t == 30) {
-		data.z += 0.1f;
-	}
-
-	BLEAdvertisementData d = BLEAdvertisementData();
-	d.setFlags(0x06);
-	std::string payload = "";
-	payload += (char)(4 + sizeof(data_u));
-	payload += (char)0xff;  // Advertise Data Type: 0xff, Manufacturer specific data
-	payload += (char)0xff;  // Manufacture ID (Low)
-	payload += (char)0xff;  // Manufacture ID (High)
-	payload += (char)seq;   // シーケンス番号
-	for (int i = 0; i < sizeof(data_u); i++) payload += (char)data.raw[i];
-	d.addData(payload);
-	seq++;
-	adv->setAdvertisementData(d);
-	adv->start();
-}
-*/

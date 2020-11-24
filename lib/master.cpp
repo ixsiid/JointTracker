@@ -10,7 +10,7 @@
 uint8_t who[128];
 
 OscClient* osc;
-OscArgument_t osc_args;
+VMTJointArgument_t osc_args;
 
 data_u data;
 
@@ -22,7 +22,10 @@ Vector3<float> left_ankle;
 Vector3<float> right_ankle;
 
 struct Joint_s {
+	const char* root_serial;
+	int32_t mode;
 	uint8_t address;
+	uint8_t tracker_index;
 	Vector3<float> boneLength;
 	Quaternion last_rotation;
 };
@@ -38,9 +41,9 @@ struct JointList_s {
 };
 
 Joint_s right_leg[3] = {
-    {0, {0.12f, -0.04f, 0.13f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // hip
-    {8, {0.00f, -0.38f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // nee
-    {9, {0.00f, -0.48f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // ankle
+    {Config::root_tracker_serial, 0, 0, 7, {0.0f, -0.04f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // hip
+    {"VMT_7", 1, 8, 8, {0.00f, -0.38f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				   // nee
+    {"VMT_8", 1, 9, 9, {0.00f, -0.48f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				   // ankle
 };
 
 JointChain_s right_leg_chain = {3, right_leg};
@@ -48,9 +51,13 @@ JointChain_s chains[1]	    = {right_leg_chain};
 
 JointList_s joints = {1, chains};
 
+bool send = false;
+
 void setup() {
 	M5.begin(true, false, false, true);
 
+	/*
+	// I2C 接続アドレス一覧
 	for (int i = 0; i < 127; i++) {
 		Wire.beginTransmission(i);
 		who[i] = Wire.endTransmission();
@@ -62,6 +69,7 @@ void setup() {
 			M5.Lcd.printf("%2x ", who[i + y * 16]);
 		}
 	}
+	*/
 
 	WiFi.mode(WIFI_STA);
 	WiFi.begin(Config::ssid, Config::passphrase);
@@ -74,10 +82,10 @@ void setup() {
 	M5.Lcd.print("Done");
 
 	osc	    = new OscClient(Config::vmt_host, Config::vmt_port);
-	osc_args = {Config::root_tracker_serial,      // Serial
-		       1.0f, 0.0f, 0.0f, 0.0f,		 // qw, qz, qy, qx
-			  0.0f, 1.0f, 0.0f,				 // z, y, x
-			  0.0f, 1, Config::tracker_index};	 // time, enable, index
+	osc_args = {0, 0,				  // Mode, Serial
+			  1.0f, 0.0f, 0.0f, 0.0f,  // qw, qz, qy, qx
+			  0.0f, 1.0f, 0.0f,		  // z, y, x
+			  0.0f, 1, 0};			  // time, enable, index
 }
 
 uint8_t cmd[1] = {0};
@@ -85,7 +93,7 @@ uint8_t cmd[1] = {0};
 void loop() {
 	// これはトラッカーから得る情報
 	Vector3<float> hip	 = {0.0f, 0.0f, 0.0f};
-	float theta = 2.0f / 360.0f * 2.0f * 3.1415f;
+	float theta		 = 2.0f / 360.0f * 2.0f * 3.1415f;
 	Quaternion tracker_q = {sinf(theta), 0.0f, 0.0f, cosf(theta)};
 
 	Vector3<float> pos = hip;
@@ -98,7 +106,8 @@ void loop() {
 	for (int i = 0; i < j->count; i++) {
 		Joint_s* joint = &(j->joints[i]);
 
-		int addr = joint->address;
+		int addr		= joint->address;
+		osc_args.index = joint->tracker_index;
 
 		if (addr) {
 			i2c_err_t err = Wire.writeTransmission(addr, &(*cmd = COMMAND_GET_QUATERNION), 1, true);
@@ -112,15 +121,29 @@ void loop() {
 				joint->last_rotation = data.q;
 			}
 			rq = joint->last_rotation;
-
-			osc_args.index = addr;
-		} else {
-			osc_args.index = 7;
 		}
 
-		pos += rq * joint->boneLength;
-		osc_args.set(rq, pos);
-		osc->send(&osc_args);
+		pos = rq * joint->boneLength;
+
+		if (send) {
+			osc_args.mode	 = joint->mode;
+			osc_args.serial = joint->root_serial;
+			osc_args.set(rq, pos);
+			size_t len = osc->send(&osc_args);
+
+			if (false) {
+				M5.Lcd.setCursor(0, 40);
+				M5.Lcd.fillRect(0, 40, 320, 100, TFT_BLACK);
+				M5.Lcd.printf("len: %d\n", len);
+				for (int i = 0; i < len; i++) {
+					M5.Lcd.printf("%2x ", osc->buffer[i]);
+					if ((i & 0b1111) == 0b1111)
+						M5.Lcd.print('\n');
+					else if ((i & 0b111) == 0b111)
+						M5.Lcd.print("  ");
+				}
+			}
+		}
 
 		py += 11;
 	}
@@ -142,6 +165,22 @@ void loop() {
 			Wire.writeTransmission(i, &(*cmd = COMMAND_SET_Z_DIRECTION), 1, true);
 			Wire.flush();
 			delay(5);
+		}
+	}
+
+	if (M5.BtnC.wasPressed()) {
+		send = 1 - send;
+		M5.Lcd.setCursor(190, 0);
+		M5.Lcd.printf(send ? "RUNNING" : "STOP   ");
+
+		if (!send) {
+			for (int i = 7; i <= 9; i++) {
+				osc_args.index	 = i;
+				osc_args.serial = nullptr;
+				osc_args.enable = 0;
+				osc_args.set({0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f});
+				osc->send(&osc_args);
+			}
 		}
 	}
 
