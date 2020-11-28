@@ -74,6 +74,10 @@ class MPU6886 : public IIMU {
 	Vector3<int16_t> getGyroAdc();
 	Vector3<float> getGyro();
 
+	int16_t getTemp();
+	int16_t getTempAndGyroAdc(Vector3<int16_t>* gyro);
+	int16_t getData(Vector3<int16_t>* accel, Vector3<int16_t>* gyro);
+
 	void getAccelAdc(Vector3<int16_t>* accel);
 	void getGyroAdc(Vector3<int16_t>* gyro);
 
@@ -237,6 +241,41 @@ void MPU6886::getGyroAdc(Vector3<int16_t> * gyro) {
 	gyro->x = ((int16_t)buffer[0] << 8) | buffer[1];
 	gyro->y = ((int16_t)buffer[2] << 8) | buffer[3];
 	gyro->z = ((int16_t)buffer[4] << 8) | buffer[5];
+}
+
+int16_t MPU6886::getTemp() {
+	uint8_t buffer[2];
+	i2c->read_bytes(MPU6886_ADDRESS, MPU6886_TEMP_OUT_H, buffer, 2);
+	return ((int16_t)buffer[0] << 8) | buffer[1];
+}
+
+
+int16_t MPU6886::getTempAndGyroAdc(Vector3<int16_t> * gyro) {
+	uint8_t buffer[8];
+
+	i2c->read_bytes(MPU6886_ADDRESS, MPU6886_TEMP_OUT_H, buffer, 8);
+
+	gyro->x = ((int16_t)buffer[2] << 8) | buffer[3];
+	gyro->y = ((int16_t)buffer[4] << 8) | buffer[5];
+	gyro->z = ((int16_t)buffer[6] << 8) | buffer[7];
+
+	return ((int16_t)buffer[0] << 8) | buffer[1];
+}
+
+
+int16_t MPU6886::getData(Vector3<int16_t> * accel, Vector3<int16_t> * gyro) {
+	uint8_t buffer[14];
+	i2c->read_bytes(MPU6886_ADDRESS, MPU6886_ACCEL_XOUT_H, buffer, 6);
+
+	accel->x = ((int16_t)buffer[0] << 8) | buffer[1];
+	accel->y = ((int16_t)buffer[2] << 8) | buffer[3];
+	accel->z = ((int16_t)buffer[4] << 8) | buffer[5];
+
+	gyro->x = ((int16_t)buffer[8] << 8) | buffer[9];
+	gyro->y = ((int16_t)buffer[10] << 8) | buffer[11];
+	gyro->z = ((int16_t)buffer[12] << 8) | buffer[13];
+	
+	return ((int16_t)buffer[6] << 8) | buffer[7];
 }
 
 }  // namespace ESPIDF

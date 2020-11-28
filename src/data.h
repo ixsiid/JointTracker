@@ -7,6 +7,7 @@ union data_u {
 	struct {
 		uint32_t header;
 		Quaternion q;
+		Quaternion rot;
 		uint32_t footer;
 	};
 };

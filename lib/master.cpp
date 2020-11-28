@@ -27,6 +27,7 @@ struct Joint_s {
 	uint8_t address;
 	uint8_t tracker_index;
 	Vector3<float> boneLength;
+	Quaternion last_position;
 	Quaternion last_rotation;
 };
 
@@ -40,16 +41,25 @@ struct JointList_s {
 	JointChain_s* chains;
 };
 
+const float sq2 = sqrtf(0.5f);
+
 Joint_s right_leg[3] = {
-    {Config::root_tracker_serial, 0, 0, 7, {0.0f, -0.04f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // hip
-    {"VMT_7", 1, 8, 8, {0.00f, -0.38f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				   // nee
-    {"VMT_8", 1, 9, 9, {0.00f, -0.48f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				   // ankle
+    {Config::root_tracker_serial, 0, 0, 12, {0.11f, -0.14f, -0.08f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // hip
+    {"VMT_12", 1, 13, 13, {0.00f, -0.38f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				  // nee
+    {"VMT_13", 1, 14, 14, {0.00f, -0.48f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				  // ankle
+};
+
+Joint_s left_leg[3] = {
+    {Config::root_tracker_serial, 0, 0, 16, {-0.11f, -0.14f, -0.08f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // hip
+    {"VMT_16", 1, 17, 17, {0.00f, -0.38f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				   // nee
+    {"VMT_17", 1, 18, 18, {0.00f, -0.48f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				   // ankle
 };
 
 JointChain_s right_leg_chain = {3, right_leg};
-JointChain_s chains[1]	    = {right_leg_chain};
+JointChain_s left_leg_chain  = {3, left_leg};
+JointChain_s chains[2]	    = {right_leg_chain, left_leg_chain};
 
-JointList_s joints = {1, chains};
+JointList_s joints = {2, chains};
 
 bool send = false;
 
@@ -91,78 +101,75 @@ void setup() {
 uint8_t cmd[1] = {0};
 
 void loop() {
-	// これはトラッカーから得る情報
-	Vector3<float> hip	 = {0.0f, 0.0f, 0.0f};
-	float theta		 = 2.0f / 360.0f * 2.0f * 3.1415f;
-	Quaternion tracker_q = {sinf(theta), 0.0f, 0.0f, cosf(theta)};
-
-	Vector3<float> pos = hip;
-
 	int py = 25;
 
-	JointChain_s* j = joints.chains + 0;
-	Quaternion rq	 = tracker_q;
+	for (int k = 0; k < joints.count; k++) {
+		JointChain_s* j = joints.chains + k;
 
-	for (int i = 0; i < j->count; i++) {
-		Joint_s* joint = &(j->joints[i]);
+		for (int i = 0; i < j->count; i++) {
+			Joint_s* joint = &(j->joints[i]);
 
-		int addr		= joint->address;
-		osc_args.index = joint->tracker_index;
+			int addr		= joint->address;
+			osc_args.index = joint->tracker_index;
 
-		if (addr) {
-			i2c_err_t err = Wire.writeTransmission(addr, &(*cmd = COMMAND_GET_QUATERNION), 1, true);
-			delayMicroseconds(15);
-			i2c_err_t err2 = Wire.readTransmission(addr, data.raw, sizeof(data_u));
+			if (addr) {
+				i2c_err_t err = Wire.writeTransmission(addr, &(*cmd = COMMAND_GET_QUATERNION), 1, true);
+				delayMicroseconds(15);
+				i2c_err_t err2 = Wire.readTransmission(addr, data.raw, sizeof(data_u));
 
-			if (data.header == SYNC_HEADER && data.footer == SYNC_FOOTER) {
-				M5.Lcd.setCursor(0, py);
-				M5.Lcd.printf("%2d [%d, %d] %3.3f, %3.3f, %3.3f, %3.3f      \n", i, err, err2, data.q.x, data.q.y, data.q.z, data.q.w);
+				if (data.header == SYNC_HEADER && data.footer == SYNC_FOOTER) {
+					M5.Lcd.setCursor(0, py);
+					M5.Lcd.printf("%2d [%d, %d] %3.3f, %3.3f, %3.3f, %3.3f      \n", i, err, err2, data.q.x, data.q.y, data.q.z, data.q.w);
 
-				joint->last_rotation = data.q;
-			}
-			rq = joint->last_rotation;
-		}
-
-		pos = rq * joint->boneLength;
-
-		if (send) {
-			osc_args.mode	 = joint->mode;
-			osc_args.serial = joint->root_serial;
-			osc_args.set(rq, pos);
-			size_t len = osc->send(&osc_args);
-
-			if (false) {
-				M5.Lcd.setCursor(0, 40);
-				M5.Lcd.fillRect(0, 40, 320, 100, TFT_BLACK);
-				M5.Lcd.printf("len: %d\n", len);
-				for (int i = 0; i < len; i++) {
-					M5.Lcd.printf("%2x ", osc->buffer[i]);
-					if ((i & 0b1111) == 0b1111)
-						M5.Lcd.print('\n');
-					else if ((i & 0b111) == 0b111)
-						M5.Lcd.print("  ");
+					joint->last_position = data.q;
+					joint->last_rotation = data.rot;
 				}
 			}
-		}
 
-		py += 11;
+			Vector3<float> pos = joint->last_position * joint->boneLength;
+			Quaternion rot	    = joint->last_position * joint->last_rotation;
+
+			if (send) {
+				osc_args.mode	 = joint->mode;
+				osc_args.serial = joint->root_serial;
+				osc_args.set(rot, pos);
+				size_t len = osc->send(&osc_args);
+
+				if (false) {
+					M5.Lcd.setCursor(0, 40);
+					M5.Lcd.fillRect(0, 40, 320, 100, TFT_BLACK);
+					M5.Lcd.printf("len: %d\n", len);
+					for (int i = 0; i < len; i++) {
+						M5.Lcd.printf("%2x ", osc->buffer[i]);
+						if ((i & 0b1111) == 0b1111)
+							M5.Lcd.print('\n');
+						else if ((i & 0b111) == 0b111)
+							M5.Lcd.print("  ");
+					}
+				}
+			}
+
+			py += 11;
+		}
 	}
+
+	uint8_t address[] = {13, 14, 17, 18};
 
 	M5.update();
 	if (M5.BtnB.wasPressed()) {
-		for (int i = 8; i < 10; i++) {
+		for (int i = 0; i <4; i++) {
 			Wire.flush();
 			delay(10);
-			Wire.writeTransmission(i, &(*cmd = COMMAND_SET_NEUTRAL_QUATERNION), 1, true);
+			Wire.writeTransmission(address[i], &(*cmd = COMMAND_SET_NEUTRAL_QUATERNION), 1, true);
 			Wire.flush();
 			delay(5);
 		}
 	}
 	if (M5.BtnA.wasPressed()) {
-		for (int i = 8; i < 10; i++) {
+		for (int i = 0; i < 4; i++) {
 			Wire.flush();
 			delay(10);
-			Wire.writeTransmission(i, &(*cmd = COMMAND_SET_Z_DIRECTION), 1, true);
+			Wire.writeTransmission(address[i], &(*cmd = COMMAND_SET_Z_DIRECTION), 1, true);
 			Wire.flush();
 			delay(5);
 		}
@@ -173,6 +180,7 @@ void loop() {
 		M5.Lcd.setCursor(190, 0);
 		M5.Lcd.printf(send ? "RUNNING" : "STOP   ");
 
+		osc_args.enable = send;
 		if (!send) {
 			for (int i = 7; i <= 9; i++) {
 				osc_args.index	 = i;
@@ -184,5 +192,5 @@ void loop() {
 		}
 	}
 
-	delay(5);
+	delay(2);
 }

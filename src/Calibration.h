@@ -2,8 +2,12 @@
 
 #include <stdint.h>
 
-#include "Vector3.h"
 #include "IIMU.h"
+#include "Vector3.h"
+
+struct temper_chara_t {
+	Vector3<float> a, b;
+};
 
 class Calibration {
     public:
@@ -13,7 +17,10 @@ class Calibration {
 		Accelemeter = 1 << 2,
 	};
 
+	/// count数分のサンプリングからゼロバイアスを推定します
 	Calibration(IIMU *imu, int32_t count, uint32_t gyro_threshould = 100, uint32_t accel_threshould = 360);
+	/// 測定済みの温度特性からゼロバイアスを推定します
+	Calibration(IIMU *imu, temper_chara_t chara);
 	~Calibration();
 	void regist(Mode mode);
 	void regist(int mode);
@@ -23,9 +30,11 @@ class Calibration {
 	void getGyroAdc(Vector3<int32_t> *value);
 	void getAccelAdc(Vector3<int32_t> *value);
 
-	Vector3<int16_t> g, a;
-	Vector3<int32_t> da;
-	int32_t dm;
+	void getData(Vector3<int32_t> *accel, Vector3<int32_t> *gyro);
+
+	Vector3<int16_t> a;
+	Vector3<int32_t> gyro_a;
+	Vector3<int32_t> gyro_b;
 
     private:
 	IIMU *sensor;
@@ -43,13 +52,25 @@ Calibration::Calibration(IIMU *imu, int count, uint32_t gyro_threshould, uint32_
 	this->accel_threshould = accel_threshould * accel_threshould;
 
 	raw = new Vector3<int16_t>[count];
-	
-	g.x = g.y = g.z = 0;
+
 	a.x = a.y = a.z = 0;
-	da.x = da.y = da.z = dm = 0;
+
+	gyro_a = {0, 0, 0};
+	gyro_b = {0, 0, 0};
 
 	this->count = 0;
 	this->mode  = Mode::None;
+}
+
+Calibration::Calibration(IIMU *imu, temper_chara_t chara) {
+	this->sensor	   = imu;
+	this->count_limit = -1;
+
+	a.x = a.y = a.z = 0;
+	gyro_a		 = chara.a * 0x10000;
+	gyro_b		 = chara.b * 0x10000;
+
+	this->mode = Mode::None;
 }
 
 void Calibration::regist(Mode mode) {
@@ -62,6 +83,7 @@ void Calibration::regist(int mode) {
 
 bool Calibration::proccess() {
 	if (!mode) return true;
+	if (count_limit <= 0) return true;
 
 	if (count >= count_limit) {
 		Vector3<int32_t> sum = {0, 0, 0};
@@ -69,26 +91,25 @@ bool Calibration::proccess() {
 		Vector3<int32_t> max = {raw[0].x, raw[0].y, raw[0].z};
 
 		for (int i = 1; i < count_limit; i++) {
-			if(raw[i].x > max.x) max.x = raw[i].x;
-			if(raw[i].y > max.x) max.y = raw[i].y;
-			if(raw[i].z > max.x) max.z = raw[i].z;
-			if(raw[i].x < min.x) min.x = raw[i].x;
-			if(raw[i].y < min.x) min.y = raw[i].y;
-			if(raw[i].z < min.x) min.z = raw[i].z;
+			if (raw[i].x > max.x) max.x = raw[i].x;
+			if (raw[i].y > max.x) max.y = raw[i].y;
+			if (raw[i].z > max.x) max.z = raw[i].z;
+			if (raw[i].x < min.x) min.x = raw[i].x;
+			if (raw[i].y < min.x) min.y = raw[i].y;
+			if (raw[i].z < min.x) min.z = raw[i].z;
 
 			sum += raw[i];
 		}
 
-		da = max - min;
-		dm = da.Dot2();
+		Vector3<int32_t> da = max - min;
+		int32_t dm		= da.Dot2();
 
 		count = 0;
 		sum /= count_limit;
 		if (mode & Mode::Gyro) {
 			if (dm < gyro_threshould) {
-				g.x = -sum.x;
-				g.y = -sum.y;
-				g.z = -sum.z;
+				gyro_a = {0, 0, 0};
+				gyro_b = sum * -1 * 0x10000;
 
 				mode = static_cast<Mode>(mode & ~Mode::Gyro);
 			}
@@ -106,7 +127,7 @@ bool Calibration::proccess() {
 			sensor->getGyroAdc(&raw[count]);
 		} else if (mode & Mode::Accelemeter) {
 			sensor->getAccelAdc(&raw[count]);
-			raw[count].z -= 4096; // 8G Scale (range 32768)の1G
+			raw[count].z -= 4096;  // 8G Scale (range 32768)の1G
 		}
 		count++;
 	}
@@ -120,26 +141,28 @@ void Calibration::getStatus(char *buffer) {
 	} else {
 		int t = 0;
 		if (mode & Mode::Gyro) {
-			t = sprintf(buffer, "Gyro");
+			t = sprintf(buffer, "Gyro processing");
 		} else if (mode & Mode::Accelemeter) {
-			t = sprintf(buffer, "Accelemeter");
+			t = sprintf(buffer, "Accelemeter processing");
 		} else {
 			t = sprintf(buffer, "Unknown");
 		}
-		sprintf(buffer + t, " proccessing: [%d, %d, %d] (%d), %d", da.x, da.y, da.z, dm, count);
 	}
 }
 
 Calibration::~Calibration() {
-	delete[] raw;
+	if (count_limit > 0) delete[] raw;
 }
 
 void Calibration::getGyroAdc(Vector3<int32_t> *value) {
 	Vector3<int16_t> gyro;
-	sensor->getGyroAdc(&gyro);
-	value->x = g.x + gyro.x;
-	value->y = g.y + gyro.y;
-	value->z = g.z + gyro.z;
+	int32_t temper = sensor->getTempAndGyroAdc(&gyro);
+
+	Vector3<int32_t> offset = (gyro_a * temper + gyro_b) / 0x10000;
+
+	value->x = offset.x + gyro.x;
+	value->y = offset.y + gyro.y;
+	value->z = offset.z + gyro.z;
 }
 
 void Calibration::getAccelAdc(Vector3<int32_t> *value) {
@@ -149,3 +172,20 @@ void Calibration::getAccelAdc(Vector3<int32_t> *value) {
 	value->y = a.y + accel.y;
 	value->z = a.z + accel.z;
 }
+
+void Calibration::getData(Vector3<int32_t> *accel, Vector3<int32_t> *gyro) {
+	Vector3<int16_t> ac, gy;
+	int32_t temper = sensor->getData(&ac, &gy);
+
+	accel->x = a.x + ac.x;
+	accel->y = a.y + ac.y;
+	accel->z = a.z + ac.z;
+
+	Vector3<int32_t> offset = (gyro_a * temper + gyro_b) / 0x10000;
+
+	gyro->x = offset.x + gy.x;
+	gyro->x = offset.x + gy.x;
+	gyro->x = offset.x + gy.x;
+}
+
+
