@@ -3,11 +3,10 @@
 #include <Wire.h>
 #include <Preferences.h>
 
-#include "Config.h"
 #include "OscClient.h"
 #include "data.h"
 
-uint8_t who[128];
+// uint8_t who[128];
 
 OscClient* osc;
 VMTJointArgument_t osc_args;
@@ -36,23 +35,15 @@ struct Joint_s {
 	Quaternion xy_correction;
 };
 
-const float sq2 = sqrtf(0.5f);
-
 // ボーンはIMUの座標系で
 size_t fix_bone_count = 0;
-Joint_s fix_bone[8]  = {
-	 {Config_root_tracker_serial, 0, 0, 12, {+0.11f, 0.08f, -0.14f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	// right hip
-	 {Config_root_tracker_serial, 0, 0, 16, {-0.11f, 0.08f, -0.14f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	// left  hip
-};
+Joint_s fix_bone[8];
 
-size_t movable_count = 4;
-Joint_s movable[8]	 = {
-	 // root      addr id  bone                   rotate                    calibrate                 xy correction
-	 {"VMT_16", 0, 17, 17, {0.00f, 0.0f, -0.35f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	 // left  nee
-	 {"VMT_17", 0, 18, 18, {0.00f, 0.0f, -0.46f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	 // left  ankle
-	 {"VMT_12", 0, 13, 13, {0.00f, 0.0f, -0.35f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	 // right nee
-	 {"VMT_13", 0, 14, 14, {0.00f, 0.0f, -0.46f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	 // right ankle
-};
+size_t movable_count = 0;
+Joint_s movable[8];
+
+uint8_t vmt_host[4];
+uint16_t vmt_port;
 
 bool fix_send = true;
 
@@ -76,6 +67,7 @@ void printBone() {
 #define CONFIGURE_CMD_BONECOUNT 0x38771d81
 #define CONFIGURE_CMD_FIXBONE 0xf729adc8
 #define CONFIGURE_CMD_MOVABLE 0xab8cf912
+#define CONFIGURE_CMD_HOST 0x431fac89
 
 union configure_u {
 	char raw[128];
@@ -102,24 +94,36 @@ union configure_u {
 				uint8_t movable_count;
 				uint16_t reserved_1;
 			};
+			struct {
+				uint8_t ip0;
+				uint8_t ip1;
+				uint8_t ip2;
+				uint8_t ip3;
+				uint16_t port;
+				uint16_t reserved_2;
+			};
 		};
 	};
 };
 
-#define CONFIGURE_DONE 0x7921a8c9
+#define CONFIGURE_DONE 0x7921a8ca
 
 static void
 uart_configure_task(void* arg) {
 	configure_u cmd;
 	bool wifi_configured = false;
 	bool bone_configured = false;
+	bool host_configured = false;
 
 	bool interpriter = true;
 
 	char key_fix[5] = "fix0";
 	char key_mov[5] = "mov0";
 
+	uint32_t ip;
+
 	while (true) {
+		// この辺の M5.Lcd.print はデバッグ用なので消す
 		vTaskDelay(100);
 		if (interpriter) printf("%d, %d >\n", fix_bone_count, movable_count);
 		size_t len = fread(cmd.raw, 1, 128, stdin);
@@ -171,13 +175,28 @@ uart_configure_task(void* arg) {
 				key_mov[3] = '0' + cmd.bone_index;
 				pref.putBytes(key_mov, cmd.data, 52);
 				break;
+			case CONFIGURE_CMD_HOST:
+				M5.Lcd.printf(" configure host: %d.%d.%d.%d:%d", cmd.ip0, cmd.ip1, cmd.ip2, cmd.ip3, cmd.port);
+				ip = cmd.ip0;
+				ip <<= 8;
+				ip |= cmd.ip1;
+				ip <<= 8;
+				ip |= cmd.ip2;
+				ip <<= 8;
+				ip |= cmd.ip3;
+				pref.putInt("host_ip", ip);
+				pref.putShort("host_port", cmd.port);
+
+				host_configured = true;
+				break;
 		}
 
-		if (wifi_configured && bone_configured) {
+		if (wifi_configured && bone_configured && host_configured) {
 			M5.Lcd.println("initialized");
 			pref.putInt("version", CONFIGURE_DONE);
 			wifi_configured = false;
 			bone_configured = false;
+			host_configured = false;
 		}
 	}
 }
@@ -231,7 +250,14 @@ void setup() {
 	M5.Lcd.print("WiFi connected, ");
 	M5.Lcd.print(WiFi.localIP().toString());
 
-	osc	    = new OscClient(Config::vmt_host, Config::vmt_port);
+	uint32_t ip = pref.getInt("host_ip", 0x00000000);
+	vmt_host[0] = ip >> 24;
+	vmt_host[1] = (ip >> 16) & 0xff;
+	vmt_host[2] = (ip >> 8) & 0xff;
+	vmt_host[3] = ip & 0xff;
+	vmt_port = pref.getShort("host_port", 39570);
+
+	osc	    = new OscClient(vmt_host, vmt_port);
 	osc_args = {0, 0,				  // Mode, Serial
 			  1.0f, 0.0f, 0.0f, 0.0f,  // qw, qz, qy, qx
 			  0.0f, 1.0f, 0.0f,		  // z, y, x
