@@ -1,10 +1,10 @@
 #include <M5Stack.h>
 #include <WiFi.h>
 #include <Wire.h>
+#include <Preferences.h>
 
 #include "Config.h"
 #include "OscClient.h"
-#include "command.h"
 #include "data.h"
 
 uint8_t who[128];
@@ -14,57 +14,193 @@ VMTJointArgument_t osc_args;
 
 data_u data;
 
-Vector3<float> left_hip;
-Vector3<float> right_hip;
-Vector3<float> left_nee;
-Vector3<float> right_nee;
-Vector3<float> left_ankle;
-Vector3<float> right_ankle;
+Preferences pref;
 
-struct Joint_s {
-	const char* root_serial;
-	int32_t mode;
+struct JointConfigure {
+	char root_serial[20];
+	uint16_t reserved;
 	uint8_t address;
 	uint8_t tracker_index;
-	Vector3<float> boneLength;
-	Quaternion last_position;
-	Quaternion last_rotation;
+	Vector3<float> bone;
+	Quaternion rotation;
 };
 
-struct JointChain_s {
-	size_t count;
-	Joint_s* joints;
-};
-
-struct JointList_s {
-	size_t count;
-	JointChain_s* chains;
+struct Joint_s {
+	char root_serial[20];
+	uint16_t reserved;
+	uint8_t address;
+	uint8_t tracker_index;
+	Vector3<float> bone;
+	Quaternion rotation;
+	Quaternion calibrate;
+	Quaternion xy_correction;
 };
 
 const float sq2 = sqrtf(0.5f);
 
-Joint_s right_leg[3] = {
-    {Config::root_tracker_serial, 0, 0, 12, {0.11f, -0.14f, -0.08f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // hip
-    {"VMT_12", 1, 13, 13, {0.00f, -0.38f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				  // nee
-    {"VMT_13", 1, 14, 14, {0.00f, -0.48f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				  // ankle
+// ボーンはIMUの座標系で
+size_t fix_bone_count = 0;
+Joint_s fix_bone[8]  = {
+	 {Config_root_tracker_serial, 0, 0, 12, {+0.11f, 0.08f, -0.14f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	// right hip
+	 {Config_root_tracker_serial, 0, 0, 16, {-0.11f, 0.08f, -0.14f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	// left  hip
 };
 
-Joint_s left_leg[3] = {
-    {Config::root_tracker_serial, 0, 0, 16, {-0.11f, -0.14f, -0.08f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},  // hip
-    {"VMT_16", 1, 17, 17, {0.00f, -0.38f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				   // nee
-    {"VMT_17", 1, 18, 18, {0.00f, -0.48f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},				   // ankle
+size_t movable_count = 4;
+Joint_s movable[8]	 = {
+	 // root      addr id  bone                   rotate                    calibrate                 xy correction
+	 {"VMT_16", 0, 17, 17, {0.00f, 0.0f, -0.35f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	 // left  nee
+	 {"VMT_17", 0, 18, 18, {0.00f, 0.0f, -0.46f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	 // left  ankle
+	 {"VMT_12", 0, 13, 13, {0.00f, 0.0f, -0.35f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	 // right nee
+	 {"VMT_13", 0, 14, 14, {0.00f, 0.0f, -0.46f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},	 // right ankle
 };
 
-JointChain_s right_leg_chain = {3, right_leg};
-JointChain_s left_leg_chain  = {3, left_leg};
-JointChain_s chains[2]	    = {right_leg_chain, left_leg_chain};
+bool fix_send = true;
 
-JointList_s joints = {2, chains};
+void printBone() {
+	M5.Lcd.fillRect(0, 90, 320, 120, BLACK);
+	M5.Lcd.setCursor(0, 90 + 2);
 
-bool send = false;
+	Joint_s* allJointList[] = {fix_bone, movable};
+	size_t count[]		    = {fix_bone_count, movable_count};
+	for (int i = 0; i < 2; i++) {
+		M5.Lcd.println(i == 0 ? "  Fix Joint" : "\n  Movable Joint");
+		for (int n = 0; n < count[i]; n++) {
+			Joint_s* j = allJointList[i] + n;
+			M5.Lcd.printf("%2d %12s [%+.2f %+.2f %+.2f]\n", j->tracker_index, j->root_serial, j->bone.x, j->bone.y, j->bone.z);
+		}
+	}
+}
+
+#define CONFIGURE_CMD_WIFI 0x128422fd
+#define CONFIGURE_CMD_REBOOT 0xff8d91a8
+#define CONFIGURE_CMD_BONECOUNT 0x38771d81
+#define CONFIGURE_CMD_FIXBONE 0xf729adc8
+#define CONFIGURE_CMD_MOVABLE 0xab8cf912
+
+union configure_u {
+	char raw[128];
+	struct {
+		size_t length;
+		uint32_t command;
+		union {
+			byte data[120];
+			struct {	// wifi settings
+				char ssid[32];
+				char passphrase[32];
+			};
+			struct {
+				char root_serial[20];
+				uint8_t reserved_0;
+				uint8_t bone_index;
+				uint8_t address;
+				uint8_t tracker_index;
+				Vector3<float> bone;
+				Quaternion rotation;
+			};
+			struct {
+				uint8_t fix_bone_count;
+				uint8_t movable_count;
+				uint16_t reserved_1;
+			};
+		};
+	};
+};
+
+#define CONFIGURE_DONE 0x7921a8c9
+
+static void
+uart_configure_task(void* arg) {
+	configure_u cmd;
+	bool wifi_configured = false;
+	bool bone_configured = false;
+
+	bool interpriter = true;
+
+	char key_fix[5] = "fix0";
+	char key_mov[5] = "mov0";
+
+	while (true) {
+		vTaskDelay(100);
+		if (interpriter) printf("%d, %d >\n", fix_bone_count, movable_count);
+		size_t len = fread(cmd.raw, 1, 128, stdin);
+
+		if (len > 0) {
+		M5.Lcd.printf("\n[%d] (%x) ", len, cmd.command);
+		if (len == 72)
+		for (int i=0; i<len; i++) {
+			M5.Lcd.printf("%2x ", cmd.raw[i]);
+		}
+		}
+
+
+		interpriter = len > 0;
+		if (len != cmd.length) continue;
+		switch (cmd.command) {
+			case CONFIGURE_CMD_WIFI:
+				M5.Lcd.printf(" configure wifi: %s, %s\n", cmd.ssid, cmd.passphrase);
+				size_t a;
+				a = pref.putString("ssid", cmd.ssid);
+				M5.Lcd.printf("\n write ssid %d", a);
+				a = pref.putString("pass", cmd.passphrase);
+				M5.Lcd.printf("\n write pass %d", a);
+
+				wifi_configured = true;
+				break;
+			case CONFIGURE_CMD_REBOOT:
+				pref.end();
+				ESP.restart();
+				break;
+			case CONFIGURE_CMD_BONECOUNT:
+				M5.Lcd.printf(" configure bone count: %d, %d\n", cmd.fix_bone_count, cmd.movable_count);
+				if (cmd.fix_bone_count > 8) cmd.fix_bone_count = 8;
+				if (cmd.movable_count > 8) cmd.movable_count = 8;
+				pref.putChar("fix", cmd.fix_bone_count);
+				pref.putChar("mov", cmd.movable_count);
+				
+				bone_configured = true;
+				break;
+			case CONFIGURE_CMD_FIXBONE:
+				M5.Lcd.printf(" configure Fix bone: %d\n", cmd.bone_index);
+				if (cmd.bone_index > 8) continue;
+				key_fix[3] = '0' + cmd.bone_index;
+				pref.putBytes(key_fix, cmd.data, 52);
+				break;
+			case CONFIGURE_CMD_MOVABLE:
+				M5.Lcd.printf(" configure Mov bone: %d\n", cmd.bone_index);
+				if (cmd.bone_index > 8) continue;
+				key_mov[3] = '0' + cmd.bone_index;
+				pref.putBytes(key_mov, cmd.data, 52);
+				break;
+		}
+
+		if (wifi_configured && bone_configured) {
+			M5.Lcd.println("initialized");
+			pref.putInt("version", CONFIGURE_DONE);
+			wifi_configured = false;
+			bone_configured = false;
+		}
+	}
+}
+
+bool main_loop_start;
 
 void setup() {
 	M5.begin(true, false, false, true);
+	pref.begin("JTracker", false);
+
+	xTaskCreate(uart_configure_task, "configure_task", 1024 * 4, nullptr, 10, nullptr);
+
+	if (pref.getInt("version", 0) != CONFIGURE_DONE) {
+		main_loop_start = false;
+		M5.Lcd.print("Please configure wifi and bone settings first.");
+		return;
+	}
+	main_loop_start = true;
+
+	char ssid[32], passphrase[32];
+	pref.getString("ssid", ssid, 31);
+	pref.getString("pass", passphrase, 31);
+	ssid[31] = passphrase[31] = '\0';
 
 	/*
 	// I2C 接続アドレス一覧
@@ -82,115 +218,136 @@ void setup() {
 	*/
 
 	WiFi.mode(WIFI_STA);
-	WiFi.begin(Config::ssid, Config::passphrase);
-	M5.Lcd.setCursor(2, 12);
+	WiFi.begin(ssid, passphrase);
+	M5.Lcd.setCursor(5, 2);
 	M5.Lcd.print("WiFi connecting");
+	bool dot = true;
 	while (WiFi.status() != WL_CONNECTED) {
 		delay(300);
-		M5.Lcd.print(".");
+		M5.Lcd.setCursor(2 + 5 * 16, 12);
+		M5.Lcd.print((dot = !dot) ? "." : " ");
 	}
-	M5.Lcd.print("Done");
+	M5.Lcd.setCursor(5, 2);
+	M5.Lcd.print("WiFi connected, ");
+	M5.Lcd.print(WiFi.localIP().toString());
 
 	osc	    = new OscClient(Config::vmt_host, Config::vmt_port);
 	osc_args = {0, 0,				  // Mode, Serial
 			  1.0f, 0.0f, 0.0f, 0.0f,  // qw, qz, qy, qx
 			  0.0f, 1.0f, 0.0f,		  // z, y, x
-			  0.0f, 1, 0};			  // time, enable, index
+			  0.0f, 0, 0};			  // time, enable, index
+
+	fix_bone_count = pref.getChar("fix", 0);
+	char key[5] = "fix0";
+	for(int i=0; i<fix_bone_count; i++) {
+		Joint_s *j = fix_bone + i;
+		pref.getBytes(key, j, sizeof(JointConfigure));
+		j->calibrate = {0.0f, 0.0f, 0.0f, 1.0f};
+		j->xy_correction = {0.0f, 0.0f, 0.0f, 1.0f};
+		key[3]++;
+	}
+	
+	movable_count = pref.getChar("mov", 0);
+	key[0] = 'm', key[1] = 'o', key[2] = 'v', key[3] = '0';
+	for(int i=0; i<movable_count; i++) {
+		Joint_s *j = movable + i;
+		pref.getBytes(key, j, sizeof(JointConfigure));
+		j->calibrate = {0.0f, 0.0f, 0.0f, 1.0f};
+		j->xy_correction = {0.0f, 0.0f, 0.0f, 1.0f};
+		key[3]++;
+	}
+
+	printBone();
 }
 
-uint8_t cmd[1] = {0};
+uint8_t cmd[1];
 
 void loop() {
+	if (!main_loop_start) {
+		delay(1000);
+		return;
+	}
 	int py = 25;
 
-	for (int k = 0; k < joints.count; k++) {
-		JointChain_s* j = joints.chains + k;
-
-		for (int i = 0; i < j->count; i++) {
-			Joint_s* joint = &(j->joints[i]);
-
-			int addr		= joint->address;
-			osc_args.index = joint->tracker_index;
-
-			if (addr) {
-				i2c_err_t err = Wire.writeTransmission(addr, &(*cmd = COMMAND_GET_QUATERNION), 1, true);
-				delayMicroseconds(15);
-				i2c_err_t err2 = Wire.readTransmission(addr, data.raw, sizeof(data_u));
-
-				if (data.header == SYNC_HEADER && data.footer == SYNC_FOOTER) {
-					M5.Lcd.setCursor(0, py);
-					M5.Lcd.printf("%2d [%d, %d] %3.3f, %3.3f, %3.3f, %3.3f      \n", i, err, err2, data.q.x, data.q.y, data.q.z, data.q.w);
-
-					joint->last_position = data.q;
-					joint->last_rotation = data.rot;
-				}
-			}
-
-			Vector3<float> pos = joint->last_position * joint->boneLength;
-			Quaternion rot	    = joint->last_position * joint->last_rotation;
-
-			if (send) {
-				osc_args.mode	 = joint->mode;
-				osc_args.serial = joint->root_serial;
-				osc_args.set(rot, pos);
-				size_t len = osc->send(&osc_args);
-
-				if (false) {
-					M5.Lcd.setCursor(0, 40);
-					M5.Lcd.fillRect(0, 40, 320, 100, TFT_BLACK);
-					M5.Lcd.printf("len: %d\n", len);
-					for (int i = 0; i < len; i++) {
-						M5.Lcd.printf("%2x ", osc->buffer[i]);
-						if ((i & 0b1111) == 0b1111)
-							M5.Lcd.print('\n');
-						else if ((i & 0b111) == 0b111)
-							M5.Lcd.print("  ");
-					}
-				}
-			}
-
-			py += 11;
+	if (osc_args.enable && fix_send) {
+		osc_args.mode = 0;
+		for (int i = 0; i < sizeof(fix_bone) / sizeof(fix_bone[0]); i++) {
+			Joint_s* j	 = fix_bone + i;
+			osc_args.serial = j->root_serial;
+			osc_args.index	 = j->tracker_index;
+			osc_args.set(j->rotation, j->rotation * j->bone);
+			osc->send(&osc_args);
 		}
 	}
 
-	uint8_t address[] = {13, 14, 17, 18};
+	osc_args.mode = 1;
+	cmd[0]	    = COMMAND_GET_QUATERNION;
+	for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
+		py += 11;
+
+		Joint_s* j = movable + i;
+
+		osc_args.serial = j->root_serial;
+		osc_args.index	 = j->tracker_index;
+
+		i2c_err_t err = Wire.writeTransmission(j->address, cmd, 1, true);
+		delayMicroseconds(15);
+		i2c_err_t err2 = Wire.readTransmission(j->address, data.raw, sizeof(data_u));
+
+		if (err != ESP_OK || err2 != ESP_OK) continue;
+		if (data.header != SYNC_HEADER || data.footer != SYNC_FOOTER) continue;
+
+		M5.Lcd.setCursor(0, py);
+		M5.Lcd.printf("%2d [%d, %d] %3.3f, %3.3f, %3.3f, %3.3f      \n", j->address, err, err2, data.ahrs.x, data.ahrs.y, data.ahrs.z, data.ahrs.w);
+
+		j->rotation = data.ahrs;
+
+		if (osc_args.enable) {
+			Quaternion rot	    = j->rotation * j->calibrate;
+			Vector3<float> pos = rot * j->bone;
+			osc_args.set(j->xy_correction * rot, j->xy_correction * pos);
+			osc->send(&osc_args);
+		}
+	}
 
 	M5.update();
-	if (M5.BtnB.wasPressed()) {
-		for (int i = 0; i <4; i++) {
-			Wire.flush();
-			delay(10);
-			Wire.writeTransmission(address[i], &(*cmd = COMMAND_SET_NEUTRAL_QUATERNION), 1, true);
-			Wire.flush();
-			delay(5);
+	if (M5.BtnA.wasPressed()) {
+		// XY平面回転補正
+		for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
+			Joint_s* j	  = movable + i;
+			Vector3<float> b = (j->rotation * j->calibrate) * j->bone;
+			float _05_theta  = (atan2(b.y, b.x) + 3.1415926535897932384626433832795f * 0.5f) * 0.5f;
+			j->xy_correction = Quaternion::xyzw(0.0f, 0.0f, cosf(_05_theta), sinf(_05_theta));
 		}
 	}
-	if (M5.BtnA.wasPressed()) {
-		for (int i = 0; i < 4; i++) {
-			Wire.flush();
-			delay(10);
-			Wire.writeTransmission(address[i], &(*cmd = COMMAND_SET_Z_DIRECTION), 1, true);
-			Wire.flush();
-			delay(5);
+
+	if (M5.BtnB.wasPressed()) {
+		// 原点設定（キャリブレーション）
+		for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
+			Joint_s* j	  = movable + i;
+			j->calibrate	  = j->rotation.inverse();
+			j->xy_correction = Quaternion::identify();
 		}
 	}
 
 	if (M5.BtnC.wasPressed()) {
-		send = 1 - send;
+		osc_args.enable = 1 - osc_args.enable;
 		M5.Lcd.setCursor(190, 0);
-		M5.Lcd.printf(send ? "RUNNING" : "STOP   ");
+		M5.Lcd.print(osc_args.enable ? "RUNNING" : "STOP   ");
 
-		osc_args.enable = send;
-		if (!send) {
-			for (int i = 7; i <= 9; i++) {
-				osc_args.index	 = i;
-				osc_args.serial = nullptr;
-				osc_args.enable = 0;
-				osc_args.set({0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f});
+		if (!osc_args.enable) {
+			osc_args.serial = nullptr;
+			osc_args.set({0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f});
+			for (int i = 0; i < sizeof(fix_bone) / sizeof(fix_bone[0]); i++) {
+				osc_args.index = fix_bone[i].tracker_index;
+				osc->send(&osc_args);
+			}
+			for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
+				osc_args.index = movable[i].tracker_index;
 				osc->send(&osc_args);
 			}
 		}
 	}
 
-	delay(2);
+	delay(1);
 }

@@ -96,15 +96,16 @@ void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a) {
 	norm = 1.0f / norm;		    // use reciprocal for division
 	a *= norm;
 
-	int64_t t		    = esp_timer_get_time();
-	float samplePeriod = (t - time) / 1000000.0f;
-	time			    = t;
+	int64_t t = esp_timer_get_time();
+	float dt	= (t - time) / 1000000.0f;
+	time		= t;
 
 	// Auxiliary variables to avoid repeated arithmetic
 	Quaternion qq = q.Dot(q);
 
 	float qqxy = qq.x + qq.y;
 	float qqwz = qq.w + qq.z;
+
 	// Gradient decent algorithm corrective step
 	Quaternion s = {
 	    q.x * qqwz - 0.5f * (q.z * a.x + q.w * a.y) + q.x * (-1.0f + 2.0f * qq.x + 2.0f * qq.y + a.z),
@@ -118,10 +119,11 @@ void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a) {
 				    +q.w * g.y - q.x * g.z + q.z * g.x,
 				    +q.w * g.z + q.x * g.y - q.y * g.x,
 				    -q.x * g.x - q.y * g.y - q.z * g.z};
+
 	qdot = qdot * 0.5f - s * beta;
 
 	// Integrate to yield quaternion
-	q += qdot * samplePeriod;
+	q += qdot * dt;
 	q.normalize(true);
 }
 

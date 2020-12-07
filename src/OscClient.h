@@ -22,12 +22,12 @@ struct VMTJointArgument_t {
 
 	void set(Quaternion rotation, Vector3<float> position) {
 		this->qw = rotation.w;
-		this->qz = rotation.z;
-		this->qy = rotation.y;
+		this->qz = -rotation.y;
+		this->qy = rotation.z;
 		this->qx = rotation.x;
 
-		this->z = position.z;
-		this->y = position.y;
+		this->z = -position.y;
+		this->y = position.z;
 		this->x = position.x;
 	}
 };

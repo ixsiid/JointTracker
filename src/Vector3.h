@@ -8,15 +8,7 @@ template <typename T>
 struct Vector3 {
 	T x, y, z;
 
-	Vector3() {
-		x = y = z = 0;
-	}
-
-	Vector3(T x, T y, T z) {
-		this->x = x;
-		this->y = y;
-		this->z = z;
-	}
+	inline static Vector3 xyz(T x, T y, T z) { return {x, y, z}; }
 
 	Vector3<T> add(Vector3<T> value) {
 		x += value.x;
@@ -28,6 +20,13 @@ struct Vector3 {
 	/// x^2 + y^2 + z^2
 	T Dot2() {
 		return x * x + y * y + z * z;
+	}
+
+	template <typename S, typename U>
+	void setWithAdd(Vector3<S> a, Vector3<U> b) {
+		x = a.x + b.x;
+		y = a.y + b.y;
+		z = a.z + b.z;
 	}
 
 	template <typename S>
@@ -55,7 +54,16 @@ struct Vector3 {
 		return r;
 	}
 
-	Vector3<T> operator+(Vector3<T> value) {
+	Vector3<T> operator-() {
+		Vector3<T> r;
+		r.x = -x;
+		r.y = -y;
+		r.z = -z;
+		return r;
+	}
+
+	template <typename S>
+	Vector3<T> operator+(Vector3<S> value) {
 		Vector3<T> r;
 		r.x = x + value.x;
 		r.y = y + value.y;
@@ -149,21 +157,9 @@ struct Quaternion {
 	float z;
 	float w;
 
-	static Quaternion identify() {
-		Quaternion q;
-		q.x = q.y = q.z = 0.0f;
-		q.w			 = 1.0f;
-		return q;
-	}
+	inline static Quaternion identify() { return {0.0f, 0.0f, 0.0f, 1.0f}; }
 
-	static Quaternion xyzw(float x, float y, float z, float w) {
-		Quaternion q;
-		q.x = x;
-		q.y = y;
-		q.z = z;
-		q.w = w;
-		return q;
-	}
+	inline static Quaternion xyzw(float x, float y, float z, float w) { return {x, y, z, w}; }
 
 	void normalize() {
 		float n = 1.0f / sqrtf(x * x + y * y + z * z + w * w);

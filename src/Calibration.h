@@ -32,11 +32,12 @@ class Calibration {
 
 	void getData(Vector3<int32_t> *accel, Vector3<int32_t> *gyro);
 
-	Vector3<int16_t> a;
-	Vector3<int32_t> gyro_a;
-	Vector3<int32_t> gyro_b;
+	Vector3<int32_t> a, g;
+	Vector3<int32_t> gyro_a, gyro_b;
 
     private:
+     void calcOffsetByTemperCharacteristics();
+
 	IIMU *sensor;
 	int32_t count_limit;
 	uint32_t gyro_threshould, accel_threshould;
@@ -44,6 +45,8 @@ class Calibration {
 	int32_t count;
 	Mode mode;
 };
+
+inline void Calibration::regist(int mode) { this->mode = static_cast<Mode>(mode); }
 
 Calibration::Calibration(IIMU *imu, int count, uint32_t gyro_threshould, uint32_t accel_threshould) {
 	this->sensor		   = imu;
@@ -53,10 +56,8 @@ Calibration::Calibration(IIMU *imu, int count, uint32_t gyro_threshould, uint32_
 
 	raw = new Vector3<int16_t>[count];
 
-	a.x = a.y = a.z = 0;
-
-	gyro_a = {0, 0, 0};
-	gyro_b = {0, 0, 0};
+	a = {0, 0, 0};
+	g = {0, 0, 0};
 
 	this->count = 0;
 	this->mode  = Mode::None;
@@ -66,19 +67,23 @@ Calibration::Calibration(IIMU *imu, temper_chara_t chara) {
 	this->sensor	   = imu;
 	this->count_limit = -1;
 
-	a.x = a.y = a.z = 0;
-	gyro_a		 = chara.a * 0x10000;
-	gyro_b		 = chara.b * 0x10000;
+	a = {0, 0, 0};
+
+	gyro_a = chara.a * 0x10000;
+	gyro_b = chara.b * 0x10000;
+
+	calcOffsetByTemperCharacteristics();
 
 	this->mode = Mode::None;
 }
 
-void Calibration::regist(Mode mode) {
-	this->mode = mode;
+void Calibration::calcOffsetByTemperCharacteristics(){
+	int32_t temper = sensor->getTemp();
+	g = (gyro_a * temper + gyro_b) / 0x10000;
 }
 
-void Calibration::regist(int mode) {
-	this->mode = static_cast<Mode>(mode);
+void Calibration::regist(Mode mode) {
+	this->mode = mode;
 }
 
 bool Calibration::proccess() {
@@ -108,16 +113,13 @@ bool Calibration::proccess() {
 		sum /= count_limit;
 		if (mode & Mode::Gyro) {
 			if (dm < gyro_threshould) {
-				gyro_a = {0, 0, 0};
-				gyro_b = sum * -1 * 0x10000;
+				g = -sum;
 
 				mode = static_cast<Mode>(mode & ~Mode::Gyro);
 			}
 		} else if (mode & Mode::Accelemeter) {
 			if (dm < accel_threshould) {
-				a.x = -sum.x;
-				a.y = -sum.y;
-				a.z = -sum.z;
+				a = -sum;
 
 				mode = static_cast<Mode>(mode & ~Mode::Accelemeter);
 			}
@@ -139,13 +141,12 @@ void Calibration::getStatus(char *buffer) {
 	if (!mode) {
 		sprintf(buffer, "Done. ");
 	} else {
-		int t = 0;
 		if (mode & Mode::Gyro) {
-			t = sprintf(buffer, "Gyro processing");
+			sprintf(buffer, "Gyro processing");
 		} else if (mode & Mode::Accelemeter) {
-			t = sprintf(buffer, "Accelemeter processing");
+			sprintf(buffer, "Accelemeter processing");
 		} else {
-			t = sprintf(buffer, "Unknown");
+			sprintf(buffer, "Unknown");
 		}
 	}
 }
@@ -156,18 +157,17 @@ Calibration::~Calibration() {
 
 void Calibration::getGyroAdc(Vector3<int32_t> *value) {
 	Vector3<int16_t> gyro;
-	int32_t temper = sensor->getTempAndGyroAdc(&gyro);
+	sensor->getGyroAdc(&gyro);
 
-	Vector3<int32_t> offset = (gyro_a * temper + gyro_b) / 0x10000;
-
-	value->x = offset.x + gyro.x;
-	value->y = offset.y + gyro.y;
-	value->z = offset.z + gyro.z;
+	value->x = g.x + gyro.x;
+	value->y = g.y + gyro.y;
+	value->z = g.z + gyro.z;
 }
 
 void Calibration::getAccelAdc(Vector3<int32_t> *value) {
 	Vector3<int16_t> accel;
 	sensor->getAccelAdc(&accel);
+
 	value->x = a.x + accel.x;
 	value->y = a.y + accel.y;
 	value->z = a.z + accel.z;
@@ -175,17 +175,9 @@ void Calibration::getAccelAdc(Vector3<int32_t> *value) {
 
 void Calibration::getData(Vector3<int32_t> *accel, Vector3<int32_t> *gyro) {
 	Vector3<int16_t> ac, gy;
-	int32_t temper = sensor->getData(&ac, &gy);
+	sensor->getGyroAdc(&gy);
+	sensor->getAccelAdc(&ac);
 
-	accel->x = a.x + ac.x;
-	accel->y = a.y + ac.y;
-	accel->z = a.z + ac.z;
-
-	Vector3<int32_t> offset = (gyro_a * temper + gyro_b) / 0x10000;
-
-	gyro->x = offset.x + gy.x;
-	gyro->x = offset.x + gy.x;
-	gyro->x = offset.x + gy.x;
+	accel->setWithAdd(a, ac);
+	gyro->setWithAdd(g, gy);
 }
-
-
