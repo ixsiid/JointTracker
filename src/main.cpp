@@ -1,7 +1,7 @@
-#ifdef BUILD_MASTER
-#include "../lib/master.cpp"
+#ifdef BUILD_PARENT
+#include "../lib/parent.cpp"
 #endif
 
-#ifdef BUILD_SLAVE
-#include "../lib/slave.cpp"
+#ifdef BUILD_WORKER
+#include "../lib/worker.cpp"
 #endif

@@ -125,7 +125,7 @@ uart_configure_task(void* arg) {
 	while (true) {
 		// この辺の M5.Lcd.print はデバッグ用なので消す
 		vTaskDelay(100);
-		if (interpriter) printf(">\n", fix_bone_count, movable_count);
+		if (interpriter) printf(">\n");
 		size_t len = fread(cmd.raw, 1, 128, stdin);
 
 		if (len > 0) {
@@ -258,7 +258,7 @@ void setup() {
 	vmt_port = pref.getShort("host_port", 39570);
 
 	osc	    = new OscClient(vmt_host, vmt_port);
-	osc_args = {0, 0,				  // Mode, Serial
+	osc_args = {nullptr,			  // Serial
 			  1.0f, 0.0f, 0.0f, 0.0f,  // qw, qz, qy, qx
 			  0.0f, 1.0f, 0.0f,		  // z, y, x
 			  0.0f, 0, 0};			  // time, enable, index
@@ -296,17 +296,15 @@ void loop() {
 	int py = 25;
 
 	if (osc_args.enable && fix_send) {
-		osc_args.mode = 0;
 		for (int i = 0; i < sizeof(fix_bone) / sizeof(fix_bone[0]); i++) {
 			Joint_s* j	 = fix_bone + i;
 			osc_args.serial = j->root_serial;
 			osc_args.index	 = j->tracker_index;
 			osc_args.set(j->rotation, j->rotation * j->bone);
-			osc->send(&osc_args);
+			osc->send_joint(&osc_args);
 		}
 	}
 
-	osc_args.mode = 1;
 	cmd[0]	    = COMMAND_GET_QUATERNION;
 	for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
 		py += 11;
@@ -332,7 +330,7 @@ void loop() {
 			Quaternion rot	    = j->rotation * j->calibrate;
 			Vector3<float> pos = rot * j->bone;
 			osc_args.set(j->xy_correction * rot, j->xy_correction * pos);
-			osc->send(&osc_args);
+			osc->send_follow(&osc_args);
 		}
 	}
 
@@ -366,11 +364,11 @@ void loop() {
 			osc_args.set({0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f});
 			for (int i = 0; i < sizeof(fix_bone) / sizeof(fix_bone[0]); i++) {
 				osc_args.index = fix_bone[i].tracker_index;
-				osc->send(&osc_args);
+				osc->send_joint(&osc_args);
 			}
 			for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
 				osc_args.index = movable[i].tracker_index;
-				osc->send(&osc_args);
+				osc->send_follow(&osc_args);
 			}
 		}
 	}
