@@ -125,7 +125,7 @@ uart_configure_task(void* arg) {
 	while (true) {
 		// この辺の M5.Lcd.print はデバッグ用なので消す
 		vTaskDelay(100);
-		if (interpriter) printf("%d, %d >\n", fix_bone_count, movable_count);
+		if (interpriter) printf(">\n", fix_bone_count, movable_count);
 		size_t len = fread(cmd.raw, 1, 128, stdin);
 
 		if (len > 0) {
