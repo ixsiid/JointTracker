@@ -128,15 +128,6 @@ uart_configure_task(void* arg) {
 		if (interpriter) printf(">\n");
 		size_t len = fread(cmd.raw, 1, 128, stdin);
 
-		if (len > 0) {
-		M5.Lcd.printf("\n[%d] (%x) ", len, cmd.command);
-		if (len == 72)
-		for (int i=0; i<len; i++) {
-			M5.Lcd.printf("%2x ", cmd.raw[i]);
-		}
-		}
-
-
 		interpriter = len > 0;
 		if (len != cmd.length) continue;
 		switch (cmd.command) {
@@ -243,13 +234,10 @@ void setup() {
 	bool dot = true;
 	while (WiFi.status() != WL_CONNECTED) {
 		delay(300);
-		M5.Lcd.setCursor(2 + 5 * 16, 12);
+		M5.Lcd.setCursor(5 + 6 * 16, 2);
 		M5.Lcd.print((dot = !dot) ? "." : " ");
 	}
-	M5.Lcd.setCursor(5, 2);
-	M5.Lcd.print("WiFi connected, ");
-	M5.Lcd.print(WiFi.localIP().toString());
-
+	
 	uint32_t ip = pref.getInt("host_ip", 0x00000000);
 	vmt_host[0] = ip >> 24;
 	vmt_host[1] = (ip >> 16) & 0xff;
@@ -257,6 +245,14 @@ void setup() {
 	vmt_host[3] = ip & 0xff;
 	vmt_port = pref.getShort("host_port", 39570);
 
+	M5.Lcd.setCursor(5, 2);
+	M5.Lcd.printf("WiFi connected, %s->%d.%d.%d.%d",
+	               WiFi.localIP().toString(),
+				vmt_host[0],
+				vmt_host[1],
+				vmt_host[2],
+				vmt_host[3]);
+	
 	osc	    = new OscClient(vmt_host, vmt_port);
 	osc_args = {nullptr,			  // Serial
 			  1.0f, 0.0f, 0.0f, 0.0f,  // qw, qz, qy, qx
@@ -305,7 +301,7 @@ void loop() {
 		}
 	}
 
-	cmd[0]	    = COMMAND_GET_QUATERNION;
+	cmd[0] = COMMAND_GET_QUATERNION;
 	for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
 		py += 11;
 
@@ -336,6 +332,15 @@ void loop() {
 
 	M5.update();
 	if (M5.BtnA.wasPressed()) {
+		// 原点設定（キャリブレーション）
+		for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
+			Joint_s* j	  = movable + i;
+			j->calibrate	  = j->rotation.inverse();
+			j->xy_correction = Quaternion::identify();
+		}
+	}
+
+	if (M5.BtnB.wasPressed()) {
 		// XY平面回転補正
 		for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
 			Joint_s* j	  = movable + i;
@@ -345,18 +350,9 @@ void loop() {
 		}
 	}
 
-	if (M5.BtnB.wasPressed()) {
-		// 原点設定（キャリブレーション）
-		for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
-			Joint_s* j	  = movable + i;
-			j->calibrate	  = j->rotation.inverse();
-			j->xy_correction = Quaternion::identify();
-		}
-	}
-
 	if (M5.BtnC.wasPressed()) {
 		osc_args.enable = 1 - osc_args.enable;
-		M5.Lcd.setCursor(190, 0);
+		M5.Lcd.setCursor(190, 18);
 		M5.Lcd.print(osc_args.enable ? "RUNNING" : "STOP   ");
 
 		if (!osc_args.enable) {
