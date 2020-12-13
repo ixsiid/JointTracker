@@ -56,6 +56,7 @@ Parentデバイスは、WiFiを利用しOSCプロトコルで、PC側にセッ�
 
 Virtual Motion Trackerは受信データを既存のトラッカーに**JOINT**させることで、Steam VR上でトラッカーが追加されたように認識します
 
+
 # セットアップ
 
 [Joint Tracker Manager](https://github.com/ixsiid/JointTrackerManager)を利用するとセットアップに便利です
@@ -369,6 +370,15 @@ M5 Stackの3つのボタンを使います
   - この時点で、XY平面の向きが補正されて正常なトラッキングが開始されます
 
 ToDo 動画
+
+# ビルド
+
+Platform IO環境が必要です
+
+```bash
+cd devices/{parent|worker|ble}
+pio run (-t upload)
+```
 
 # ToDo
 
