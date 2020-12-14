@@ -151,7 +151,7 @@ uart_configure_task(void* arg) {
 				if (cmd.movable_count > 8) cmd.movable_count = 8;
 				pref.putChar("fix", cmd.fix_bone_count);
 				pref.putChar("mov", cmd.movable_count);
-				
+
 				bone_configured = true;
 				break;
 			case CONFIGURE_CMD_FIXBONE:
@@ -237,22 +237,19 @@ void setup() {
 		M5.Lcd.setCursor(5 + 6 * 16, 2);
 		M5.Lcd.print((dot = !dot) ? "." : " ");
 	}
-	
+
 	uint32_t ip = pref.getInt("host_ip", 0x00000000);
 	vmt_host[0] = ip >> 24;
 	vmt_host[1] = (ip >> 16) & 0xff;
 	vmt_host[2] = (ip >> 8) & 0xff;
 	vmt_host[3] = ip & 0xff;
-	vmt_port = pref.getShort("host_port", 39570);
+	vmt_port	  = pref.getShort("host_port", 39570);
 
 	M5.Lcd.setCursor(5, 2);
-	M5.Lcd.printf("WiFi connected, %s->%d.%d.%d.%d",
-	               WiFi.localIP().toString(),
-				vmt_host[0],
-				vmt_host[1],
-				vmt_host[2],
-				vmt_host[3]);
-	
+	M5.Lcd.print("WiFi connected, ");
+	M5.Lcd.print(WiFi.localIP().toString());
+	M5.Lcd.printf("->%d.%d.%d.%d", vmt_host[0], vmt_host[1], vmt_host[2], vmt_host[3]);
+
 	osc	    = new OscClient(vmt_host, vmt_port);
 	osc_args = {nullptr,			  // Serial
 			  1.0f, 0.0f, 0.0f, 0.0f,  // qw, qz, qy, qx
@@ -260,21 +257,21 @@ void setup() {
 			  0.0f, 0, 0};			  // time, enable, index
 
 	fix_bone_count = pref.getChar("fix", 0);
-	char key[5] = "fix0";
-	for(int i=0; i<fix_bone_count; i++) {
-		Joint_s *j = fix_bone + i;
+	char key[5]	= "fix0";
+	for (int i = 0; i < fix_bone_count; i++) {
+		Joint_s* j = fix_bone + i;
 		pref.getBytes(key, j, sizeof(JointConfigure));
-		j->calibrate = {0.0f, 0.0f, 0.0f, 1.0f};
+		j->calibrate	  = {0.0f, 0.0f, 0.0f, 1.0f};
 		j->xy_correction = {0.0f, 0.0f, 0.0f, 1.0f};
 		key[3]++;
 	}
-	
+
 	movable_count = pref.getChar("mov", 0);
 	key[0] = 'm', key[1] = 'o', key[2] = 'v', key[3] = '0';
-	for(int i=0; i<movable_count; i++) {
-		Joint_s *j = movable + i;
+	for (int i = 0; i < movable_count; i++) {
+		Joint_s* j = movable + i;
 		pref.getBytes(key, j, sizeof(JointConfigure));
-		j->calibrate = {0.0f, 0.0f, 0.0f, 1.0f};
+		j->calibrate	  = {0.0f, 0.0f, 0.0f, 1.0f};
 		j->xy_correction = {0.0f, 0.0f, 0.0f, 1.0f};
 		key[3]++;
 	}
@@ -292,7 +289,7 @@ void loop() {
 	int py = 25;
 
 	if (osc_args.enable && fix_send) {
-		for (int i = 0; i < sizeof(fix_bone) / sizeof(fix_bone[0]); i++) {
+		for (int i = 0; i < fix_bone_count; i++) {
 			Joint_s* j	 = fix_bone + i;
 			osc_args.serial = j->root_serial;
 			osc_args.index	 = j->tracker_index;
@@ -302,7 +299,7 @@ void loop() {
 	}
 
 	cmd[0] = COMMAND_GET_QUATERNION;
-	for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
+	for (int i = 0; i < movable_count; i++) {
 		py += 11;
 
 		Joint_s* j = movable + i;
@@ -333,7 +330,7 @@ void loop() {
 	M5.update();
 	if (M5.BtnA.wasPressed()) {
 		// 原点設定（キャリブレーション）
-		for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
+		for (int i = 0; i < movable_count; i++) {
 			Joint_s* j	  = movable + i;
 			j->calibrate	  = j->rotation.inverse();
 			j->xy_correction = Quaternion::identify();
@@ -342,7 +339,7 @@ void loop() {
 
 	if (M5.BtnB.wasPressed()) {
 		// XY平面回転補正
-		for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
+		for (int i = 0; i < movable_count; i++) {
 			Joint_s* j	  = movable + i;
 			Vector3<float> b = (j->rotation * j->calibrate) * j->bone;
 			float _05_theta  = (atan2(b.y, b.x) + 3.1415926535897932384626433832795f * 0.5f) * 0.5f;
@@ -358,11 +355,11 @@ void loop() {
 		if (!osc_args.enable) {
 			osc_args.serial = nullptr;
 			osc_args.set({0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f});
-			for (int i = 0; i < sizeof(fix_bone) / sizeof(fix_bone[0]); i++) {
+			for (int i = 0; i < fix_bone_count; i++) {
 				osc_args.index = fix_bone[i].tracker_index;
 				osc->send_joint(&osc_args);
 			}
-			for (int i = 0; i < sizeof(movable) / sizeof(movable[0]); i++) {
+			for (int i = 0; i < movable_count; i++) {
 				osc_args.index = movable[i].tracker_index;
 				osc->send_follow(&osc_args);
 			}
