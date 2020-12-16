@@ -82,6 +82,8 @@
 #define HID_REPORT_TYPE_OUTPUT 2
 #define HID_REPORT_TYPE_FEATURE 3
 
+#define REPORT_LENGTH 15
+
 /// HID Service Attributes Indexes
 enum {
 	HIDD_LE_IDX_SVC,

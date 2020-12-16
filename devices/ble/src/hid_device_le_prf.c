@@ -44,40 +44,45 @@ static const uint8_t hidReportMap[] = {
     0x09, 0x01,  //   USAGE (Pointer)
     0xa1, 0x00,  //   COLLECTION (Physical)
     0x85, 0x01,  //     REPORT_ID (1)
-    // ------------------------------------------------- Buttons (1 to 14)
+    // ------------------------------------------------- Buttons (1 to 8)
     0x05, 0x09,  //     USAGE_PAGE (Button)
     0x19, 0x01,  //     USAGE_MINIMUM (Button 1)
-    0x29, 0x0e,  //     USAGE_MAXIMUM (Button 14)
+    0x29, 0x08,  //     USAGE_MAXIMUM (Button 8)
     0x15, 0x00,  //     LOGICAL_MINIMUM (0)
     0x25, 0x01,  //     LOGICAL_MAXIMUM (1)
     0x75, 0x01,  //     REPORT_SIZE (1)
-    0x95, 0x0e,  //     REPORT_COUNT (14)
-    0x81, 0x02,  //     INPUT (Data, Variable, Absolute) ;14 button bits
+    0x95, 0x08,  //     REPORT_COUNT (8)
+    0x81, 0x02,  //     INPUT (Data, Variable, Absolute) ;8 button bits
+    /*
     // ------------------------------------------------- Padding
     0x75, 0x01,  //     REPORT_SIZE (1)
     0x95, 0x02,  //     REPORT_COUNT (2)
     0x81, 0x03,  //     INPUT (Constant, Variable, Absolute) ;2 bit padding
-    // ------------------------------------------------- X/Y position, Z/rZ position
+    */
+    // ------------------------------------------------- X/Y/Z position
     0x05, 0x01,  //     USAGE_PAGE (Generic Desktop)
     0x09, 0x30,  //     USAGE (X)
     0x09, 0x31,  //     USAGE (Y)
     0x09, 0x32,  //     USAGE (Z)
-    0x09, 0x35,  //     USAGE (rZ)
-    0x15, 0x81,  //     LOGICAL_MINIMUM (-127)
-    0x25, 0x7f,  //     LOGICAL_MAXIMUM (127)
-    0x75, 0x08,  //     REPORT_SIZE (8)
-    0x95, 0x04,  //     REPORT_COUNT (4)
-    0x81, 0x02,  //     INPUT (Data, Variable, Absolute) ;4 bytes (X,Y,Z,rZ)
-
+    0x16, 0x01, 0x80,  //     LOGICAL_MINIMUM (-32767)
+    0x26, 0xff, 0x7f,  //     LOGICAL_MAXIMUM (32767)
+    0x75, 0x10,  //     REPORT_SIZE (16)
+    0x95, 0x03,  //     REPORT_COUNT (3)
+    0x81, 0x02,  //     INPUT (Data, Variable, Absolute) ;6 bytes (X,Y,Z)
+    
+    // ------------------------------------------------- rX/rY/rZ rotation
     0x05, 0x01,  //     USAGE_PAGE (Generic Desktop)
-    0x09, 0x33,  //     USAGE (rX) Left Trigger
-    0x09, 0x34,  //     USAGE (rY) Right Trigger
-    0x15, 0x81,  //     LOGICAL_MINIMUM (-127)
-    0x25, 0x7f,  //     LOGICAL_MAXIMUM (127)
-    0x75, 0x08,  //     REPORT_SIZE (8)
-    0x95, 0x02,  //     REPORT_COUNT (2)
-    0x81, 0x02,  //     INPUT (Data, Variable, Absolute) ;2 bytes rX, rY
+    0x09, 0x33,  //     USAGE (rX)
+    0x09, 0x34,  //     USAGE (rY)
+    0x09, 0x35,  //     USAGE (rZ) 
+    0x09, 0x36,  //     Usage (Slider := Qw)
+    0x16, 0x01, 0x80,  //     LOGICAL_MINIMUM (-32767)
+    0x26, 0xff, 0x7f,  //     LOGICAL_MAXIMUM (32767)
+    0x75, 0x10,  //     REPORT_SIZE (16)
+    0x95, 0x04,  //     REPORT_COUNT (3)
+    0x81, 0x02,  //     INPUT (Data, Variable, Absolute) ;6 bytes rX, rY, rZ
 
+/*
     0x05, 0x01,  //     USAGE_PAGE (Generic Desktop)
     0x09, 0x39,  //     USAGE (Hat switch)
     0x09, 0x39,  //     USAGE (Hat switch)
@@ -86,7 +91,7 @@ static const uint8_t hidReportMap[] = {
     0x75, 0x04,  //     REPORT_SIZE (4)
     0x95, 0x02,  //     REPORT_COUNT (2)
     0x81, 0x02,  //     INPUT (Data, Variable, Absolute) ;1 byte Hat1, Hat2
-
+*/
     0xc0,	 //     END_COLLECTION
     0xc0	 //     END_COLLECTION
 };

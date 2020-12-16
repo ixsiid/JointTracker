@@ -26,9 +26,6 @@ extern "C" {
 #define HID_TYPE_OUTPUT 2
 #define HID_TYPE_FEATURE 3
 
-#define HID_MOUSE_LEFT 253
-#define HID_MOUSE_MIDDLE 254
-#define HID_MOUSE_RIGHT 255
 typedef uint8_t gamepad_cmd_t;
 
 // HID report mapping table
