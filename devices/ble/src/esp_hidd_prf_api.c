@@ -19,17 +19,7 @@
 #include <string.h>
 #include "esp_log.h"
 
-// HID keyboard input report length
-#define HID_KEYBOARD_IN_RPT_LEN     8
-
-// HID LED output report length
-#define HID_LED_OUT_RPT_LEN         1
-
-// HID mouse input report length
-#define HID_MOUSE_IN_RPT_LEN        5
-
-// HID consumer control input report length
-#define HID_CC_IN_RPT_LEN           2
+#define HID_GAMEPAD_IN_RPT_LEN        5
 
 esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks)
 {
@@ -93,45 +83,11 @@ uint16_t esp_hidd_get_version(void)
 }
 
 // ToDo
-void esp_hidd_send_gamepad_value(uint16_t conn_id/* args */) {
-uint8_t buffer[] = {0}; // report length
-hid_dev_send_report(hidd_le_env.gatt_if, conn_id, HID_PRT_ID_GAMEPAD_IN, HID_REPORT_TYPE_INPUT, REPORT_LENGTH, buffer);
+void esp_hidd_send_gamepad_value(uint16_t conn_id, uint8_t *buffer, size_t length) {
+hid_dev_send_report(hidd_le_env.gatt_if, conn_id, 1/*HID_PRT_ID_GAMEPAD_IN*/, HID_REPORT_TYPE_INPUT, length, buffer);
 }
 
-void esp_hidd_send_consumer_value(uint16_t conn_id, uint8_t key_cmd, bool key_pressed)
-{
-    uint8_t buffer[HID_CC_IN_RPT_LEN] = {0, 0};
-    if (key_pressed) {
-        ESP_LOGD(HID_LE_PRF_TAG, "hid_consumer_build_report");
-        hid_consumer_build_report(buffer, key_cmd);
-    }
-    ESP_LOGD(HID_LE_PRF_TAG, "buffer[0] = %x, buffer[1] = %x", buffer[0], buffer[1]);
-    hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_CC_IN, HID_REPORT_TYPE_INPUT, HID_CC_IN_RPT_LEN, buffer);
-    return;
-}
-
-void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask, uint8_t *keyboard_cmd, uint8_t num_key)
-{
-    if (num_key > HID_KEYBOARD_IN_RPT_LEN - 2) {
-        ESP_LOGE(HID_LE_PRF_TAG, "%s(), the number key should not be more than %d", __func__, HID_KEYBOARD_IN_RPT_LEN);
-        return;
-    }
-
-    uint8_t buffer[HID_KEYBOARD_IN_RPT_LEN] = {0};
-
-    buffer[0] = special_key_mask;
-
-    for (int i = 0; i < num_key; i++) {
-        buffer[i+2] = keyboard_cmd[i];
-    }
-
-    ESP_LOGD(HID_LE_PRF_TAG, "the key vaule = %d,%d,%d, %d, %d, %d,%d, %d", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
-    hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, buffer);
-    return;
-}
-
+/*
 void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mickeys_x, int8_t mickeys_y)
 {
     uint8_t buffer[HID_MOUSE_IN_RPT_LEN];
@@ -146,3 +102,4 @@ void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mi
                         HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN, buffer);
     return;
 }
+*/

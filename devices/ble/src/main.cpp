@@ -28,6 +28,7 @@
 
 #include "esp_hidd_prf_api.h"
 #include "hid_dev.h"
+#include "hidd_le_prf_int.h"
 
 extern "C" {
 void app_main();
@@ -89,7 +90,7 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .include_txpower	= true,
     .min_interval		= 0x0006,	 //slave connection min interval, Time = min_interval * 1.25 msec
     .max_interval		= 0x0010,	 //slave connection max interval, Time = max_interval * 1.25 msec
-    .appearance		= 0x03c3,	 // (0x03C0) HID Generic, (0x03C3) Joystick, (0x03C4) GamePad
+    .appearance		= 0x03c4,	 // (0x03C0) HID Generic, (0x03C3) Joystick, (0x03C4) GamePad
     .manufacturer_len	= 0,
     .p_manufacturer_data = NULL,
     .service_data_len	= 0,
@@ -175,24 +176,20 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 	}
 }
 
+#define REPORT_LENGTH 9
+
+uint8_t buffer[REPORT_LENGTH] = {0};
+uint8_t bi = 0;
+
 void hid_demo_task(void *pvParameters) {
 	vTaskDelay(1000 / portTICK_PERIOD_MS);
 	while (1) {
-		vTaskDelay(2000 / portTICK_PERIOD_MS);
+		vTaskDelay(100 / portTICK_PERIOD_MS);
 		if (sec_conn) {
 			ESP_LOGI(HID_DEMO_TAG, "Send the volume");
-			send_volum_up = true;
-			//uint8_t key_vaule = {HID_KEY_A};
-			//esp_hidd_send_keyboard_value(hid_conn_id, 0, &key_vaule, 1);
-			esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_VOLUME_UP, true);
-			vTaskDelay(3000 / portTICK_PERIOD_MS);
-			if (send_volum_up) {
-				send_volum_up = false;
-				esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_VOLUME_UP, false);
-				esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_VOLUME_DOWN, true);
-				vTaskDelay(3000 / portTICK_PERIOD_MS);
-				esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_VOLUME_DOWN, false);
-			}
+			esp_hidd_send_gamepad_value(hid_conn_id, buffer, 9 /* sizeof(buffer) */);
+			buffer[bi++]++;
+			if (bi >= REPORT_LENGTH) bi = 0;
 		}
 	}
 }
