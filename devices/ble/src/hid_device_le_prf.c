@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "hidd_le_prf_int.h"
 #include <string.h>
-#include "esp_log.h"
+#include <esp_log.h>
+
+#include "hidd_le_prf_int.h"
 
 /// characteristic presentation information
 struct prf_char_pres_fmt {
@@ -33,10 +34,7 @@ struct prf_char_pres_fmt {
 // HID report mapping table
 static hid_report_map_t hid_rpt_map[HID_NUM_REPORTS];
 
-// ToDo
-
 // HID Report Map characteristic value
-// Keyboard report descriptor (using format for Boot interface descriptor)
 static const uint8_t hidReportMap[] = {
     0x05, 0x01,  // USAGE_PAGE (Generic Desktop)
     0x09, 0x05,  // USAGE (Gamepad)

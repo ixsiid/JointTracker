@@ -18,6 +18,11 @@
 
 #include "BleGamePad.h"
 
+// #define LGFX_M5STICK_C // Defined by platformio.ini
+#include <LovyanGFX.hpp>
+
+static LGFX lcd;
+
 extern "C" {
 void app_main();
 }
@@ -37,7 +42,7 @@ void hid_demo_task(void *pvParameters) {
 		pad.rx = cosf(theta) * 32767.0f;
 		pad.ry = sinf(theta) * 32767.0f;
 		pad.rz = (cosf(theta) * sinf(theta)) * 32767.0f;
-		
+
 		pad.slider = -(cosf(theta) * sinf(theta)) * 32767.0f;
 
 		if (BleGamePad.connected) {
@@ -48,8 +53,19 @@ void hid_demo_task(void *pvParameters) {
 
 void IRAM_ATTR on_button_click(void *arg) {}
 
+const char device[] = "VMT_25";
+
 void app_main(void) {
-	BleGamePad.begin("VMT_25");
+	lcd.init();
+	lcd.setRotation(0);
+	lcd.setBrightness(128); // [0 - 255]
+	lcd.setColorDepth(16);
+
+	lcd.startWrite();
+	lcd.drawString(device, 3, 3);
+	lcd.endWrite();
+
+	BleGamePad.begin(device);
 
 	pad.x = pad.y = pad.z = 0;
 	pad.rx = pad.ry = pad.rz = 0;
