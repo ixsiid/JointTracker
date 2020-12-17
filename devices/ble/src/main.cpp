@@ -53,12 +53,59 @@ void hid_demo_task(void *pvParameters) {
 	}
 }
 
-void IRAM_ATTR on_button_click(void *arg) {
+enum Page : int {
+	GyroZeroBias,
+	OriginCalibration,
+	DirectionCalibration,
+	Last,
+};
+
+int32_t page;
+
+void draw_page() {
+	lcd.startWrite();
+	lcd.fillRect(0, 20, 135, 220, TFT_BLACK);
+	lcd.setColor(TFT_WHITE);
+	switch (page) {
+		case GyroZeroBias:
+			lcd.drawString("Gyro Zero Bias", 2, 24);
+			break;
+		case OriginCalibration:
+			lcd.drawString("Origin Calibration", 2, 24);
+			break;
+		case DirectionCalibration:
+			lcd.drawString("Direcation Calibration", 2, 24);
+			break;
+		default:
+			lcd.drawString("Unknown Action", 2, 24);
+			break;
+	}
+	lcd.endWrite();
+}
+
+volatile bool page_change;
+void IRAM_ATTR on_side_click(void *arg) { page_change = true; }
+
+void IRAM_ATTR on_front_click(void *arg) {}
+
+void lcd_task(void *arg) {
+	vTaskDelay(1000 / portTICK_RATE_MS);
+	while (true) {
+		vTaskDelay(100 / portTICK_RATE_MS);
+		if (page_change) {
+			page_change = false;
+			if (++page >= Page::Last) page = 0;
+
+			printf("page change -> %d", page);
+			draw_page();
+		}
+	}
 }
 
 const char device[] = "VMT_25";
 
 void app_main(void) {
+	page	  = GyroZeroBias;
 	enable = false;
 
 	pad.x = pad.y = pad.z = 0;
@@ -69,7 +116,7 @@ void app_main(void) {
 
 	lcd.init();
 	lcd.setRotation(0);
-	lcd.setBrightness(64);	// [0 - 255]
+	lcd.setBrightness(64);  // [0 - 255]
 	lcd.setColorDepth(16);
 
 	lcd.startWrite();
@@ -78,9 +125,13 @@ void app_main(void) {
 
 	ESP_ERROR_CHECK(BleGamePad.begin(device));
 
-	xTaskCreate(&hid_demo_task, "hid_task", 2048, NULL, 5, NULL);
+	xTaskCreatePinnedToCore(&hid_demo_task, "hid_task", 2048, NULL, 5, NULL, 0);
 
-	ESP_ERROR_CHECK(GpioInterrupt.begin(Button::M5StickCFront, on_button_click, nullptr));
+	ESP_ERROR_CHECK(GpioInterrupt.begin(static_cast<uint64_t>(ButtonMask::M5StickCBoth)));
+	ESP_ERROR_CHECK(GpioInterrupt.add_event_handler((gpio_num_t)Button::M5StickCFront, on_front_click, nullptr));
+// 	ESP_ERROR_CHECK(GpioInterrupt.add_event_handler((gpio_num_t)Button::M5StickCSide, on_side_click, nullptr));
 
-	// xTaskCreatePinnedToCore(gpio_intr_task, "gpio", 1024 * 8, slave, 10, NULL, 1);
+	draw_page();
+
+	xTaskCreatePinnedToCore(lcd_task, "lcd", 1024 * 8, nullptr, 10, NULL, 0);
 }

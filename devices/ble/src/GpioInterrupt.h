@@ -3,26 +3,27 @@
 #include <driver/gpio.h>
 #include <esp_err.h>
 
-enum PullMode {
+enum class PullMode {
 	None,
 	PullDown,
 	PullUp,
 };
 
-enum Button {
-	M5AtomMatrix = gpio_num_t::GPIO_NUM_39,
-	M5StickCFront = gpio_num_t::GPIO_NUM_39,
-	M5StickCSide = gpio_num_t::GPIO_NUM_37,
+enum class ButtonMask : uint64_t {
+	M5StickCFront = (1ULL << gpio_num_t::GPIO_NUM_37),
+	M5StickCSide  = (1ULL << gpio_num_t::GPIO_NUM_39),
+	M5StickCBoth  = (1ULL << gpio_num_t::GPIO_NUM_37) | (1ULL << gpio_num_t::GPIO_NUM_39),
+};
+
+enum class Button {
+	M5StickCFront = GPIO_NUM_37,
+	M5StickCSide  = GPIO_NUM_39,
 };
 
 class GpioInterruptClass {
     public:
-	static esp_err_t begin(gpio_num_t port, gpio_isr_t callback, void *args, PullMode pull = PullMode::None);
-	static esp_err_t begin(Button port, gpio_isr_t callback, void *args, PullMode pull = PullMode::None);
+	static esp_err_t begin(uint64_t button_mask, PullMode pull = PullMode::None);
+	static esp_err_t add_event_handler(gpio_num_t port, gpio_isr_t callback, void *args);
 };
-
-inline esp_err_t begin(Button port, gpio_isr_t callback, void *args, PullMode pull) {
-	return begin(port, callback, args, pull);
-}
 
 extern GpioInterruptClass GpioInterrupt;
