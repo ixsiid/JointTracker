@@ -20,7 +20,7 @@
 #include "espidf_MPU6886.h"
 #include "i2c.h"
 
-#define TAG "SLAVE"
+#define TAG "WORKER"
 
 #define CONFIG_I2C_SLAVE_PORT_NUM ((i2c_port_t)1)
 #define CONFIG_I2C_SLAVE_SDA ((gpio_num_t)26)

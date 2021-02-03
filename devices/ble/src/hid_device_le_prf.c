@@ -58,29 +58,29 @@ static const uint8_t hidReportMap[] = {
     0x81, 0x03,  //     INPUT (Constant, Variable, Absolute) ;2 bit padding
     */
     // ------------------------------------------------- X/Y/Z position
-    0x05, 0x01,  //     USAGE_PAGE (Generic Desktop)
-    0x09, 0x30,  //     USAGE (X)
-    0x09, 0x31,  //     USAGE (Y)
-    0x09, 0x32,  //     USAGE (Z)
+    0x05, 0x01,	   //     USAGE_PAGE (Generic Desktop)
+    0x09, 0x30,	   //     USAGE (X)
+    0x09, 0x31,	   //     USAGE (Y)
+    0x09, 0x32,	   //     USAGE (Z)
     0x16, 0x01, 0x80,  //     LOGICAL_MINIMUM (-32767)
     0x26, 0xff, 0x7f,  //     LOGICAL_MAXIMUM (32767)
-    0x75, 0x10,  //     REPORT_SIZE (16)
-    0x95, 0x03,  //     REPORT_COUNT (3)
-    0x81, 0x02,  //     INPUT (Data, Variable, Absolute) ;6 bytes (X,Y,Z)
-    
-    // ------------------------------------------------- rX/rY/rZ rotation
-    0x05, 0x01,  //     USAGE_PAGE (Generic Desktop)
-    0x09, 0x33,  //     USAGE (rX)
-    0x09, 0x34,  //     USAGE (rY)
-    0x09, 0x35,  //     USAGE (rZ) 
-    0x09, 0x36,  //     Usage (Slider := Qw)
-    0x16, 0x01, 0x80,  //     LOGICAL_MINIMUM (-32767)
-    0x26, 0xff, 0x7f,  //     LOGICAL_MAXIMUM (32767)
-    0x75, 0x10,  //     REPORT_SIZE (16)
-    0x95, 0x04,  //     REPORT_COUNT (3)
-    0x81, 0x02,  //     INPUT (Data, Variable, Absolute) ;6 bytes rX, rY, rZ
+    0x75, 0x10,	   //     REPORT_SIZE (16)
+    0x95, 0x03,	   //     REPORT_COUNT (3)
+    0x81, 0x02,	   //     INPUT (Data, Variable, Absolute) ;6 bytes (X,Y,Z)
 
-/*
+    // ------------------------------------------------- rX/rY/rZ rotation
+    0x05, 0x01,	   //     USAGE_PAGE (Generic Desktop)
+    0x09, 0x33,	   //     USAGE (rX)
+    0x09, 0x34,	   //     USAGE (rY)
+    0x09, 0x35,	   //     USAGE (rZ)
+    0x09, 0x36,	   //     Usage (Slider := Qw)
+    0x16, 0x01, 0x80,  //     LOGICAL_MINIMUM (-32767)
+    0x26, 0xff, 0x7f,  //     LOGICAL_MAXIMUM (32767)
+    0x75, 0x10,	   //     REPORT_SIZE (16)
+    0x95, 0x04,	   //     REPORT_COUNT (3)
+    0x81, 0x02,	   //     INPUT (Data, Variable, Absolute) ;6 bytes rX, rY, rZ
+
+    /*
     0x05, 0x01,  //     USAGE_PAGE (Generic Desktop)
     0x09, 0x39,  //     USAGE (Hat switch)
     0x09, 0x39,  //     USAGE (Hat switch)
@@ -131,8 +131,10 @@ uint8_t hidProtocolMode = HID_PROTOCOL_MODE_REPORT;
 static const uint8_t hidInfo[HID_INFORMATION_LEN] = {
     LO_UINT16(0x0111), HI_UINT16(0x0111),  // bcdHID (USB HID version)
     0x00,							   // bCountryCode
-    HID_KBD_FLAGS					   // Flags
+    HID_FLAGS_NORMALLY_CONNECTABLE         // Flags
 };
+
+//HID_FLAGS_REMOTE_WAKE 0x01			// RemoteWake
 
 // HID External Report Reference Descriptor
 static uint16_t hidExtReportRefDesc = ESP_GATT_UUID_BATTERY_LEVEL;
@@ -163,6 +165,9 @@ static const uint16_t hid_report_uuid			 = ESP_GATT_UUID_HID_REPORT;
 static const uint16_t hid_proto_mode_uuid		 = ESP_GATT_UUID_HID_PROTO_MODE;
 static const uint16_t hid_repot_map_ext_desc_uuid	 = ESP_GATT_UUID_EXT_RPT_REF_DESCR;
 static const uint16_t hid_report_ref_descr_uuid	 = ESP_GATT_UUID_RPT_REF_DESCR;
+
+static const uint16_t hid_pnp_uuid = ESP_GATT_UUID_PNP_ID;
+
 ///the propoty definition
 // static const uint8_t char_prop_notify = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 static const uint8_t char_prop_read	   = ESP_GATT_CHAR_PROP_BIT_READ;
@@ -180,23 +185,24 @@ static const uint16_t char_format_uuid = ESP_GATT_UUID_CHAR_PRESENT_FORMAT;
 
 static uint8_t battary_lev = 50;
 /// Full HRS Database Description - Used to add attributes into the database
-static const esp_gatts_attr_db_t bas_att_db[BAS_IDX_NB] =
-    {
-	   // Battary Service Declaration
-	   [BAS_IDX_SVC] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&primary_service_uuid, ESP_GATT_PERM_READ, sizeof(uint16_t), sizeof(battary_svc), (uint8_t *)&battary_svc}},
+static const esp_gatts_attr_db_t bas_att_db[BAS_IDX_NB] = {
+    // Battary Service Declaration
+    [BAS_IDX_SVC] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&primary_service_uuid, ESP_GATT_PERM_READ, sizeof(uint16_t), sizeof(battary_svc), (uint8_t *)&battary_svc}},
 
-	   // Battary level Characteristic Declaration
-	   [BAS_IDX_BATT_LVL_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ, CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_notify}},
+    // Battary level Characteristic Declaration
+    [BAS_IDX_BATT_LVL_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ, CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_notify}},
 
-	   // Battary level Characteristic Value
-	   [BAS_IDX_BATT_LVL_VAL] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&bat_lev_uuid, ESP_GATT_PERM_READ, sizeof(uint8_t), sizeof(uint8_t), &battary_lev}},
+    // Battary level Characteristic Value
+    [BAS_IDX_BATT_LVL_VAL] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&bat_lev_uuid, ESP_GATT_PERM_READ, sizeof(uint8_t), sizeof(uint8_t), &battary_lev}},
 
-	   // Battary level Characteristic - Client Characteristic Configuration Descriptor
-	   [BAS_IDX_BATT_LVL_NTF_CFG] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, sizeof(uint16_t), sizeof(bat_lev_ccc), (uint8_t *)bat_lev_ccc}},
+    // Battary level Characteristic - Client Characteristic Configuration Descriptor
+    [BAS_IDX_BATT_LVL_NTF_CFG] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, sizeof(uint16_t), sizeof(bat_lev_ccc), (uint8_t *)bat_lev_ccc}},
 
-	   // Battary level report Characteristic Declaration
-	   [BAS_IDX_BATT_LVL_PRES_FMT] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&char_format_uuid, ESP_GATT_PERM_READ, sizeof(struct prf_char_pres_fmt), 0, NULL}},
+    // Battary level report Characteristic Declaration
+    [BAS_IDX_BATT_LVL_PRES_FMT] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&char_format_uuid, ESP_GATT_PERM_READ, sizeof(struct prf_char_pres_fmt), 0, NULL}},
 };
+
+uint8_t pnp[7] = {0x01,0x02, 0xe5,0xab, 0xcd,0x01, 0x10};
 
 /// Full Hid device Database Description - Used to add attributes into the database
 static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] = {
@@ -236,13 +242,17 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] = {
     [HIDD_LE_IDX_REPORT_GAMEPAD_IN_CCC] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, (ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE), sizeof(uint16_t), 0, NULL}},
 
     [HIDD_LE_IDX_REPORT_GAMEPAD_REP_REF] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid, ESP_GATT_PERM_READ, sizeof(hidReportRefGamepadIn), sizeof(hidReportRefGamepadIn), hidReportRefGamepadIn}},
-     
+
     // Report Characteristic Declaration
     [HIDD_LE_IDX_REPORT_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ, CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
     // Report Characteristic Value
     [HIDD_LE_IDX_REPORT_VAL] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid, ESP_GATT_PERM_READ, HIDD_LE_REPORT_MAX_LEN, 0, NULL}},
     // Report Characteristic - Report Reference Descriptor
     [HIDD_LE_IDX_REPORT_REP_REF] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid, ESP_GATT_PERM_READ, sizeof(hidReportRefFeature), sizeof(hidReportRefFeature), hidReportRefFeature}},
+
+    [HIDD_LE_IDX_PNP_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ, CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read}},
+    [HIDD_LE_IDX_PNP_VAL]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_pnp_uuid, ESP_GATT_PERM_READ, 7, 7, pnp}},
+
 };
 
 static void hid_add_id_tbl(void);

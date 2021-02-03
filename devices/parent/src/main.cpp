@@ -289,6 +289,7 @@ void loop() {
 	int py = 25;
 
 	if (osc_args.enable && fix_send) {
+		osc_args.enable = false;
 		for (int i = 0; i < fix_bone_count; i++) {
 			Joint_s* j	 = fix_bone + i;
 			osc_args.serial = j->root_serial;
@@ -296,6 +297,7 @@ void loop() {
 			osc_args.set(j->rotation, j->rotation * j->bone);
 			osc->send_joint(&osc_args);
 		}
+		osc_args.enable = true;
 	}
 
 	cmd[0] = COMMAND_GET_QUATERNION;
