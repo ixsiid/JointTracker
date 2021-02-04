@@ -145,10 +145,10 @@ void ahrs_task(void *arg) {
 
 	MadgwickAHRS *ahrs = new MadgwickAHRS(1.0f);
 	ahrs->reset();
-	pad.buttons = 0b00000010;
+	pad.buttons		   = 0b00000010;
 	begin_gyro_calibration = false;
-	wait_gyro_calibration = true;
-	screen_invalidate = true;
+	wait_gyro_calibration  = true;
+	screen_invalidate	   = true;
 
 	Vector3<int32_t> a, g;
 
@@ -161,8 +161,8 @@ void ahrs_task(void *arg) {
 		if (!calib->proccess()) {
 			vTaskDelay(15 / portTICK_RATE_MS);
 		} else if (begin_gyro_calibration) {
-			begin_gyro_calibration  = false;
-			wait_gyro_calibration = true;
+			begin_gyro_calibration = false;
+			wait_gyro_calibration  = true;
 
 			calib->regist(Calibration::Mode::Gyro);
 
@@ -171,13 +171,13 @@ void ahrs_task(void *arg) {
 			screen_invalidate = true;
 		} else if (wait_gyro_calibration) {
 			wait_gyro_calibration = false;
-			pad.buttons		    = 0b00000001;
+			pad.buttons		  = 0b00000001;
 
 			screen_invalidate = true;
 		} else if (origin_calibration) {
 			origin_calibration = false;
 
-			origin = ahrs->q.inverse();
+			origin	= ahrs->q.inverse();
 			direction = Quaternion::identify();
 
 			// page++;
@@ -193,7 +193,7 @@ void ahrs_task(void *arg) {
 			// screen_invalidate = true;
 		} else {
 			calib->getAccelAdc(&a);
-			calib->getGyroAdc(&g);
+			calib->getGyroAdcWithCalibrate(&g);
 
 			ahrs->update(g * s, a * t);
 
@@ -218,7 +218,7 @@ const char device[] = "Left";
 using namespace ESPIDF;
 
 void app_main(void) {
-	page	  = GyroZeroBias;
+	page = GyroZeroBias;
 
 	pad.x = pad.y = pad.z = 0;
 	pad.rx = pad.ry = pad.rz = 0;

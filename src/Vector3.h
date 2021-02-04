@@ -77,11 +77,24 @@ struct Vector3 {
 		this->z += value.z;
 	}
 
+	void operator-=(Vector3<T> value) {
+		this->x -= value.x;
+		this->y -= value.y;
+		this->z -= value.z;
+	}
+
 	template <typename S>
 	void operator+=(Vector3<S> value) {
 		this->x += value.x;
 		this->y += value.y;
 		this->z += value.z;
+	}
+
+	template <typename S>
+	void operator-=(Vector3<S> value) {
+		this->x -= value.x;
+		this->y -= value.y;
+		this->z -= value.z;
 	}
 
 	void operator*=(T value) {
@@ -99,6 +112,18 @@ struct Vector3 {
 	inline T Dot(Vector3<T> a) {
 		return x * a.x + y * a.y + z * a.z;
 	}
+
+	inline void Larger(Vector3<T> a) {
+		if (this->x < a.x) this->x = a.x;
+		if (this->y < a.y) this->y = a.y;
+		if (this->z < a.z) this->z = a.z;
+	}
+
+	inline void Smaller(Vector3<T> a) {
+		if (this->x > a.x) this->x = a.x;
+		if (this->y > a.y) this->y = a.y;
+		if (this->z > a.z) this->z = a.z;
+	}
 };
 
 struct Matrix3x3 {
@@ -106,9 +131,7 @@ struct Matrix3x3 {
 
 	Matrix3x3() {
 		columns[0].x = columns[1].y = columns[2].z = 1.0f;
-		columns[0].y						   = columns[0].z =
-		    columns[1].x					   = columns[1].z =
-			   columns[2].x = columns[2].y = 0.0f;
+		columns[0].y = columns[0].z = columns[1].x = columns[1].z = columns[2].x = columns[2].y = 0.0f;
 	}
 
 	Matrix3x3(Vector3<float> column0, Vector3<float> column1, Vector3<float> column2) {

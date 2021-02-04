@@ -30,13 +30,14 @@ class Calibration {
 	void getGyroAdc(Vector3<int32_t> *value);
 	void getAccelAdc(Vector3<int32_t> *value);
 
-	void getData(Vector3<int32_t> *accel, Vector3<int32_t> *gyro);
+	void getGyroAdcWithCalibrate(Vector3<int32_t> *value);
 
+	void getData(Vector3<int32_t> *accel, Vector3<int32_t> *gyro);
 	Vector3<int32_t> a, g;
 	Vector3<int32_t> gyro_a, gyro_b;
 
     private:
-     void calcOffsetByTemperCharacteristics();
+	void calcOffsetByTemperCharacteristics();
 
 	IIMU *sensor;
 	int32_t count_limit;
@@ -44,6 +45,7 @@ class Calibration {
 	Vector3<int16_t> *raw;
 	int32_t count;
 	Mode mode;
+	Vector3<int32_t> sum;
 };
 
 inline void Calibration::regist(int mode) { this->mode = static_cast<Mode>(mode); }
@@ -77,8 +79,9 @@ Calibration::Calibration(IIMU *imu, temper_chara_t chara) {
 	this->mode = Mode::None;
 }
 
-void Calibration::calcOffsetByTemperCharacteristics(){
+void Calibration::calcOffsetByTemperCharacteristics() {
 	int32_t temper = sensor->getTemp();
+
 	g = (gyro_a * temper + gyro_b) / 0x10000;
 }
 
@@ -91,7 +94,8 @@ bool Calibration::proccess() {
 	if (count_limit <= 0) return true;
 
 	if (count >= count_limit) {
-		Vector3<int32_t> sum = {0, 0, 0};
+		sum = {0, 0, 0};
+
 		Vector3<int32_t> min = {raw[0].x, raw[0].y, raw[0].z};
 		Vector3<int32_t> max = {raw[0].x, raw[0].y, raw[0].z};
 
@@ -106,20 +110,18 @@ bool Calibration::proccess() {
 			sum += raw[i];
 		}
 
-		Vector3<int32_t> da = max - min;
-		int32_t dm		= da.Dot2();
+		int32_t dm = (max - min).Dot2();
 
 		count = 0;
-		sum /= count_limit;
 		if (mode & Mode::Gyro) {
 			if (dm < gyro_threshould) {
-				g = -sum;
+				g = -sum / count_limit;
 
 				mode = static_cast<Mode>(mode & ~Mode::Gyro);
 			}
 		} else if (mode & Mode::Accelemeter) {
 			if (dm < accel_threshould) {
-				a = -sum;
+				a = -sum / count_limit;
 
 				mode = static_cast<Mode>(mode & ~Mode::Accelemeter);
 			}
@@ -158,6 +160,38 @@ Calibration::~Calibration() {
 void Calibration::getGyroAdc(Vector3<int32_t> *value) {
 	Vector3<int16_t> gyro;
 	sensor->getGyroAdc(&gyro);
+
+	value->x = g.x + gyro.x;
+	value->y = g.y + gyro.y;
+	value->z = g.z + gyro.z;
+}
+
+void Calibration::getGyroAdcWithCalibrate(Vector3<int32_t> *value) {
+	Vector3<int16_t> gyro;
+	sensor->getGyroAdc(&gyro);
+
+	if (count >= count_limit) count = 0;
+	sum -= raw[count];
+	raw[count] = gyro;
+	sum += gyro;
+
+	Vector3<int32_t> min = {raw[0].x, raw[0].y, raw[0].z};
+	Vector3<int32_t> max = {raw[0].x, raw[0].y, raw[0].z};
+
+	for (int i = 1; i < count_limit; i++) {
+		max.Larger(raw[i]);
+		min.Smaller(raw[i]);
+	}
+
+	int32_t dm = (max - min).Dot2();
+
+	if (dm < gyro_threshould) {
+		printf("Calibrate: [%d, %d, %d] -> ", g.x, g.y, g.z);
+		g = -sum / count_limit;
+		printf("[%d, %d, %d]\n", g.x, g.y, g.z);
+	}
+
+	count++;
 
 	value->x = g.x + gyro.x;
 	value->y = g.y + gyro.y;
