@@ -22,12 +22,15 @@ union gamepad_u {
 class BleGamePadClass {
     public:
 	static esp_err_t begin(const char *device_name);
-	static void send(gamepad_t *pad);
+	static void send1(gamepad_t *pad);
+	static void send2(gamepad_t *pad);
 	static bool connected;
 
     private:
      static bool initialized;
-	static void send(gamepad_u *pad);
+	/// controller_id -> 1 or 2
+	static void send1(gamepad_u *pad);
+	static void send2(gamepad_u *pad);
 	static char device[32];
 
 	static uint16_t hid_conn_id;
@@ -38,6 +41,7 @@ class BleGamePadClass {
 	static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 };
 
-inline void BleGamePadClass::send(gamepad_t *pad) { send((gamepad_u *)pad); }
+inline void BleGamePadClass::send1(gamepad_t *pad) { send1((gamepad_u *)pad); }
+inline void BleGamePadClass::send2(gamepad_t *pad) { send2((gamepad_u *)pad); }
 
 extern BleGamePadClass BleGamePad;

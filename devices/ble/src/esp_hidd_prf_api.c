@@ -78,6 +78,6 @@ uint16_t esp_hidd_get_version(void) {
 	return HIDD_VERSION;
 }
 
-void esp_hidd_send_gamepad_value(uint16_t conn_id, uint8_t *buffer, size_t length) {
-	hid_dev_send_report(hidd_le_env.gatt_if, conn_id, 1, HID_REPORT_TYPE_INPUT, length, buffer);
+void esp_hidd_send_gamepad_value(uint16_t conn_id, uint8_t controller_id, uint8_t *buffer, size_t length) {
+	hid_dev_send_report(hidd_le_env.gatt_if, conn_id, controller_id, HID_REPORT_TYPE_INPUT, length, buffer);
 }

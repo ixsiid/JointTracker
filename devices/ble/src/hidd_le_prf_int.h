@@ -32,13 +32,14 @@
 #define HIDD_SUB_VER 0x00							 //Version + Subversion
 #define HIDD_VERSION ((HIDD_GREAT_VER << 8) | HIDD_SUB_VER)	 //Version + Subversion
 
-#define HID_MAX_APPS 1
+#define HID_MAX_APPS 2
 
 // Number of HID reports defined in the service
-#define HID_NUM_REPORTS 2
+#define HID_NUM_REPORTS 3
 
 // HID Report IDs for the service
 #define HID_RPT_ID_GAMEPAD_IN 1  // Mouse input report ID
+#define HID_RPT_ID_GAMEPAD2_IN 2  // Mouse input report ID
 #define HID_RPT_ID_FEATURE 0	   // Feature report ID
 
 #define ATT_SVC_HID 0x1812
@@ -47,7 +48,7 @@
 #define BATTRAY_APP_ID 0x180f
 
 /// Maximal number of Report Char. that can be added in the DB for one HIDS - Up to 11
-#define HIDD_LE_NB_REPORT_INST_MAX (3)
+#define HIDD_LE_NB_REPORT_INST_MAX (4)
 
 /// Maximal length of Report Char. Value
 #define HIDD_LE_REPORT_MAX_LEN (255)
@@ -108,11 +109,16 @@ enum {
 	HIDD_LE_IDX_PROTO_MODE_CHAR,
 	HIDD_LE_IDX_PROTO_MODE_VAL,
 
-	// Report mouse input
+	// Report gamepad input
 	HIDD_LE_IDX_REPORT_GAMEPAD_IN_CHAR,
 	HIDD_LE_IDX_REPORT_GAMEPAD_IN_VAL,
 	HIDD_LE_IDX_REPORT_GAMEPAD_IN_CCC,
 	HIDD_LE_IDX_REPORT_GAMEPAD_REP_REF,
+
+	HIDD_LE_IDX_REPORT_GAMEPAD2_IN_CHAR,
+	HIDD_LE_IDX_REPORT_GAMEPAD2_IN_VAL,
+	HIDD_LE_IDX_REPORT_GAMEPAD2_IN_CCC,
+	HIDD_LE_IDX_REPORT_GAMEPAD2_REP_REF,
 
 	// Report
 	HIDD_LE_IDX_REPORT_CHAR,
@@ -133,7 +139,7 @@ enum {
 	HIDD_LE_REPORT_MAP_CHAR,
 	HIDD_LE_REPORT_CHAR,
 	HIDD_LE_PROTO_MODE_CHAR,
-	HIDD_LE_BOOT_GAMEPAD_IN_REPORT_CHAR,
+//	HIDD_LE_BOOT_GAMEPAD_IN_REPORT_CHAR,
 	HIDD_LE_CHAR_MAX  //= HIDD_LE_REPORT_CHAR + HIDD_LE_NB_REPORT_INST_MAX,
 };
 
@@ -144,7 +150,7 @@ enum {
 	HIDD_LE_READ_REPORT_MAP_EVT,
 	HIDD_LE_READ_REPORT_EVT,
 	HIDD_LE_READ_PROTO_MODE_EVT,
-	HIDD_LE_BOOT_GAMEPAD_IN_REPORT_EVT,
+//	HIDD_LE_BOOT_GAMEPAD_IN_REPORT_EVT,
 
 	HID_LE_EVT_MAX
 };
@@ -160,7 +166,8 @@ enum {
 
 /// Features Flag Values
 enum {
-	HIDD_LE_CFG_GAMEPAD	    = 0x01,
+//	HIDD_LE_CFG_GAMEPAD	    = 0x01,
+//	HIDD_LE_CFG_GAMEPAD2    = 0x02,
 	HIDD_LE_CFG_PROTO_MODE  = 0x04,
 	HIDD_LE_CFG_MAP_EXT_REF = 0x08,
 };

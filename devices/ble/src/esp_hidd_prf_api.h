@@ -140,7 +140,7 @@ esp_err_t esp_hidd_profile_deinit(void);
  *
  */
 uint16_t esp_hidd_get_version(void);
-void esp_hidd_send_gamepad_value(uint16_t conn_id, uint8_t *buffer, size_t length);
+void esp_hidd_send_gamepad_value(uint16_t conn_id, uint8_t controller_id, uint8_t *buffer, size_t length);
 
 #ifdef __cplusplus
 }

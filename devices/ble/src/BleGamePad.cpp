@@ -191,6 +191,10 @@ esp_err_t BleGamePadClass::begin(const char *device_name) {
 	return ESP_OK;
 }
 
-void BleGamePadClass::send(gamepad_u *pad) {
-	esp_hidd_send_gamepad_value(hid_conn_id, pad->raw, sizeof(gamepad_t));
+void BleGamePadClass::send1(gamepad_u *pad) {
+	esp_hidd_send_gamepad_value(hid_conn_id, 1, pad->raw, sizeof(gamepad_t));
+}
+
+void BleGamePadClass::send2(gamepad_u *pad) {
+	esp_hidd_send_gamepad_value(hid_conn_id, 2, pad->raw, sizeof(gamepad_t));
 }

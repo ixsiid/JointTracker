@@ -38,7 +38,7 @@ void hid_demo_task(void *pvParameters) {
 	while (1) {
 		vTaskDelay(20 / portTICK_PERIOD_MS);
 		if (BleGamePad.connected) {
-			BleGamePad.send(&pad);
+			BleGamePad.send1(&pad);
 		}
 	}
 }
