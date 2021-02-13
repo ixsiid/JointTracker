@@ -113,13 +113,15 @@ struct Vector3 {
 		return x * a.x + y * a.y + z * a.z;
 	}
 
-	inline void Larger(Vector3<T> a) {
+	template <typename S>
+	inline void Larger(Vector3<S> a) {
 		if (this->x < a.x) this->x = a.x;
 		if (this->y < a.y) this->y = a.y;
 		if (this->z < a.z) this->z = a.z;
 	}
 
-	inline void Smaller(Vector3<T> a) {
+	template <typename S>
+	inline void Smaller(Vector3<S> a) {
 		if (this->x > a.x) this->x = a.x;
 		if (this->y > a.y) this->y = a.y;
 		if (this->z > a.z) this->z = a.z;

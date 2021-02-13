@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "devices\\ble"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}

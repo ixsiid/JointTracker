@@ -213,7 +213,7 @@ void ahrs_task(void *arg) {
 	}
 }
 
-const char device[] = "Left";
+const char device[] = "Right";
 
 using namespace ESPIDF;
 

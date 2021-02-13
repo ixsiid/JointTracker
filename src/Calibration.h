@@ -186,9 +186,9 @@ void Calibration::getGyroAdcWithCalibrate(Vector3<int32_t> *value) {
 	int32_t dm = (max - min).Dot2();
 
 	if (dm < gyro_threshould) {
-		printf("Calibrate: [%d, %d, %d] -> ", g.x, g.y, g.z);
+//		printf("Calibrate: [%d, %d, %d] -> ", g.x, g.y, g.z);
 		g = -sum / count_limit;
-		printf("[%d, %d, %d]\n", g.x, g.y, g.z);
+//		printf("[%d, %d, %d]\n", g.x, g.y, g.z);
 	}
 
 	count++;
