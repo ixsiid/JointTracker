@@ -5,19 +5,7 @@
 
 namespace ESPIDF {
 
-wire_s I2CMaster::Default_M5Atom = {
-    .i2cnum	= (i2c_port_t)0,
-    .io_scl	= (gpio_num_t)21,
-    .io_sda	= (gpio_num_t)25,
-    .i2c_speed = 400000};
-    	
-wire_s I2CMaster::Default_M5Stick = {
-    .i2cnum	= (i2c_port_t)0,
-    .io_scl	= (gpio_num_t)22,
-    .io_sda	= (gpio_num_t)21,
-    .i2c_speed = 400000};
-
-I2CMaster::I2CMaster(wire_s* wire) : I2CMaster(wire->i2cnum, wire->io_scl, wire->io_sda, wire->i2c_speed) {}
+I2CMaster::I2CMaster(const wire_s* wire) : I2CMaster(wire->i2cnum, wire->io_scl, wire->io_sda, wire->i2c_speed) {}
 I2CMaster::I2CMaster(i2c_port_t port, gpio_num_t scl, gpio_num_t sda, uint32_t freq_hz) {
 	this->port = port;
 	

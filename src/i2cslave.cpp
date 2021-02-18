@@ -1,7 +1,7 @@
 #include "i2c.h"
 
 namespace ESPIDF {
-I2CSlave::I2CSlave(wire_s* wire, uint8_t slave_address) : I2CSlave(wire->i2cnum, wire->io_scl, wire->io_sda, slave_address) {}
+I2CSlave::I2CSlave(const wire_s* wire, uint8_t slave_address) : I2CSlave(wire->i2cnum, wire->io_scl, wire->io_sda, slave_address) {}
 I2CSlave::I2CSlave(i2c_port_t port, gpio_num_t scl, gpio_num_t sda, uint8_t slave_address) {
 	this->port = port;
 

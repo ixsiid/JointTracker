@@ -13,13 +13,42 @@ struct wire_s {
 	uint32_t i2c_speed;
 };
 
+static const wire_s Default_M5Atom = {
+    .i2cnum	= (i2c_port_t)0,
+    .io_scl	= (gpio_num_t)21,
+    .io_sda	= (gpio_num_t)25,
+    .i2c_speed = 400000};
+
+static const wire_s Default_M5Stick = {
+    .i2cnum	= (i2c_port_t)0,
+    .io_scl	= (gpio_num_t)22,
+    .io_sda	= (gpio_num_t)21,
+    .i2c_speed = 1000000};
+
+static const wire_s Default_M5Stack = {
+    .i2cnum	= (i2c_port_t)0,
+    .io_scl	= (gpio_num_t)22,
+    .io_sda	= (gpio_num_t)21,
+    .i2c_speed = 400000};
+
+static const wire_s Grove_M5Stick = {
+    .i2cnum	= (i2c_port_t)1,
+    .io_scl	= (gpio_num_t)33,
+    .io_sda	= (gpio_num_t)32,
+    .i2c_speed = 400000};
+
+static const wire_s Grove_M5Atom = {
+    .i2cnum	= (i2c_port_t)1,
+    .io_scl	= (gpio_num_t)32,
+    .io_sda	= (gpio_num_t)26,
+    .i2c_speed = 400000};
+
 #define BUFFER_LENGTH ((size_t)512)
 #define DEFAULT_WAIT_TICK (1000 / portTICK_PERIOD_MS)
 
 class I2CMaster {
     public:
-	static wire_s Default_M5Stack, Default_M5Stick, Default_M5Atom;
-	I2CMaster(wire_s* conf);
+	I2CMaster(const wire_s* conf);
 	I2CMaster(i2c_port_t port, gpio_num_t scl, gpio_num_t sda, uint32_t freq_hz);
 
 	esp_err_t get_last_error();
@@ -37,7 +66,7 @@ class I2CMaster {
 
 class I2CSlave {
     public:
-	I2CSlave(wire_s* conf, uint8_t slave_address);
+	I2CSlave(const wire_s* conf, uint8_t slave_address);
 	I2CSlave(i2c_port_t port, gpio_num_t scl, gpio_num_t sda, uint8_t slave_address);
 
 	esp_err_t get_last_error();
