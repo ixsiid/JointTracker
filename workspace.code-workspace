@@ -1,10 +1,10 @@
 {
 	"folders": [
 		{
-			"path": "devices\\ble"
+			"path": "."
 		},
 		{
-			"path": "."
+			"path": "devices\\ble_device"
 		}
 	],
 	"settings": {}

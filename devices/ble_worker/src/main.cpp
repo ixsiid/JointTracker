@@ -107,7 +107,7 @@ static void ahrs_task(void *arg) {
 	Calibration *calib = new Calibration((IIMU *)arg, 128);
 	calib->regist(Calibration::Mode::Gyro);
 
-	ahrs = new MadgwickAHRS(1.0f);
+	ahrs = new MadgwickAHRS(0.15f);
 	ahrs->reset();
 
 	Vector3<int32_t> g, a;
@@ -125,10 +125,10 @@ static void ahrs_task(void *arg) {
 	matrix->update();
 
 	while (true) {
-		vTaskDelay(1);
+		vTaskDelay(0);
 
 		calib->getAccelAdc(&a);
-		calib->getGyroAdc(&g);
+		calib->getGyroAdcWithCalibrate(&g);
 
 		ahrs->update(g * s, a * t);
 	}
@@ -139,8 +139,8 @@ void app_main() {
 	matrix = new AtoMatrix(I2S_NUM_0, pixels);
 	matrix->update();
 
-	I2CMaster *master = new I2CMaster(&Default_M5Atom);
-	I2CSlave *slave   = new I2CSlave(&Grove_M5Atom, SLAVE_ADDRESS);
+	I2CMaster *master = new I2CMaster(&M5Atom_Internal);
+	I2CSlave *slave   = new I2CSlave(&M5Atom_Grove, SLAVE_ADDRESS);
 
 	IIMU *imu = new MPU6886(master);
 

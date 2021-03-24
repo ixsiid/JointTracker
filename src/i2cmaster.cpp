@@ -30,21 +30,24 @@ I2CMaster::I2CMaster(i2c_port_t port, gpio_num_t scl, gpio_num_t sda, uint32_t f
 esp_err_t I2CMaster::get_last_error() { return last_error; }
 
 esp_err_t I2CMaster::begin_transmission(uint8_t address, uint8_t registry) {
+	last_error = 0;
+	
 	i2c_cmd_handle_t cmd = i2c_cmd_link_create();
 	ESP_ERROR_CHECK(i2c_master_start(cmd));
 	ESP_ERROR_CHECK(i2c_master_write_byte(cmd, (address << 1) | I2C_MASTER_WRITE, 1));
 	ESP_ERROR_CHECK(i2c_master_write_byte(cmd, registry, 1));
 	ESP_ERROR_CHECK(i2c_master_stop(cmd));
-	ESP_ERROR_CHECK(i2c_master_cmd_begin(port, cmd, DEFAULT_WAIT_TICK));
+	last_error = i2c_master_cmd_begin(port, cmd, DEFAULT_WAIT_TICK);
 	i2c_cmd_link_delete(cmd);
 
-	return 0;
+	return last_error;
 }
 
 esp_err_t I2CMaster::read_bytes(uint8_t address, uint8_t registry, uint8_t* buffer, size_t buffer_length) {
 	if (buffer_length == 0) return ESP_OK;
 
-	begin_transmission(address, registry);
+	last_error = begin_transmission(address, registry);
+	if (last_error != ESP_OK) return last_error;
 
 	i2c_cmd_handle_t cmd = i2c_cmd_link_create();
 

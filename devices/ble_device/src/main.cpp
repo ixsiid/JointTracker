@@ -19,7 +19,7 @@
 #include "Calibration.h"
 #include "MadgwickAHRS.h"
 #include "Vector3.h"
-#include "espidf_MPU6886.h"
+#include "espidf_LSM9DS1.h"
 #include "i2c.h"
 #include "data.h"
 
@@ -88,6 +88,9 @@ enum Page : int {
 
 int32_t page;
 
+
+Vector3<int32_t> aa, gg, mm;
+
 bool wait_gyro_calibration;
 void draw_page() {
 	lcd.startWrite();
@@ -112,6 +115,13 @@ void draw_page() {
 	char text[32];
 	sprintf(text, "Battery: %f  ", (battery_voltage[0] << 4 | battery_voltage[1]) * 1.1f / 1000.0f);
 	lcd.drawString(text, 10, 60);
+
+	sprintf(text, "%+05d  %+05d  %+05d", aa.x, aa.y, aa.z);
+	lcd.drawString(text, 3, 80);
+	sprintf(text, "%+05d  %+05d  %+05d", gg.x, gg.y, gg.z);
+	lcd.drawString(text, 3, 90);
+	sprintf(text, "%+05d  %+05d  %+05d", mm.x, mm.y, mm.z);
+	lcd.drawString(text, 3, 100);
 
 	lcd.endWrite();
 }
@@ -184,13 +194,14 @@ void lcd_task(void *arg) {
 	}
 }
 
+
 void ahrs_task(void *arg) {
 	vTaskDelay(1000 / portTICK_RATE_MS);
 
 	IIMU *imu			   = (IIMU *)arg;
 	ESPIDF::I2CMaster *i2c = (ESPIDF::I2CMaster *)imu->getI2CMaster();
 
-	Calibration *calib = new Calibration(imu, 128);
+	Calibration *calib = new Calibration(imu, 128, 1000);
 	ahrs			    = new MadgwickAHRS(0.15f);
 	ahrs->reset();
 
@@ -201,11 +212,20 @@ void ahrs_task(void *arg) {
 	// Accelemeter scale (± 8G Range by int16_t data -> m/s^2)
 	const float t = 8.0 / 32768.0;
 
-	Vector3<int32_t> a, g;
+	// Magnetic scale (± 4Gauss by int16_t data -> gauss)
+	const float u = 4.0 / 32768.0;
+
+	Vector3<int32_t> a, g, m;
 
 	calib->regist(Calibration::Mode::Gyro);
 	while (true) {
 		vTaskDelay(20 / portTICK_RATE_MS);
+		
+		calib->getAccelAdc(&aa);
+		calib->getGyroAdc(&gg);
+		calib->getMagAdc(&mm);
+		screen_invalidate = true;
+
 		if (calib->proccess()) break;
 	}
 
@@ -218,7 +238,7 @@ void ahrs_task(void *arg) {
 
 	while (true) {
 		vTaskDelay(0);
-		if (++count >= 0x8000) { // 0x8000 -> 32sec 0x80000 -> 8.7min 本運用時は0x80000でよさそ
+		if (++count >= 0x8000) {	 // 0x8000 -> 32sec 0x80000 -> 8.7min 本運用時は0x80000でよさそ
 			count = 0;
 
 			i2c->read_bytes(0x68, 0x78, battery_voltage, 2);
@@ -237,53 +257,17 @@ void ahrs_task(void *arg) {
 
 		calib->getAccelAdc(&a);
 		calib->getGyroAdcWithCalibrate(&g);
+		calib->getMagAdc(&m);
 
-		ahrs->update(g * s, a * t);
-
-		/*
-		|vTaskDelay|WithCalibrate|arhs->update|i2c_speed| pps|rate %|
-		|----------|-------------|------------|---------|----|------|
-		|         2|    TRUE     |    TRUE    |   400kHz|  50| 6.7 %|
-		|         1|    TRUE     |    TRUE    |   400kHz| 100|  13 %|
-		|         0|    TRUE     |    TRUE    |   100kHz| 380|  51 %|
-		|         0|    TRUE     |    TRUE    |   400kHz| 750| 100 %|
-		|         0|    TRUE     |    FALSE   |   400kHz| 760| 101 %|
-		|         0|    FALSE    |    TRUE    |   400kHz| 830| 111 %|
-		|         0|    TRUE     |    TRUE    |     1MHz| 965| 129 %| (動作不安定)
-		|         0|    FALSE    |    FALSE   |     1MHz|1040| 139 %| (動作不安定)
-		|         0|    FALSE    |    FALSE   |     2MHz|  動作せず |
-		|         0|    FALSE    |    FALSE   |     5MHz|  動作せず |
-		*/
+		ahrs->update(g * s, a * t, m * u);
 	}
 }
 
-const char device[] = "Chest";
+const char device[] = "Kneck";
 
 using namespace ESPIDF;
 
 #include "data.h"
-
-// Requirement "using namespace ESPIDF"
-void parent_task(void *arg) {
-	I2CMaster *i2c = new I2CMaster(&ESPIDF::M5Stick_Grove);
-
-	data_u data;
-	while (true) {
-		vTaskDelay(10 / portTICK_RATE_MS);
-		i2c->read_bytes(15, 0x23, data.raw, sizeof(data_u));
-
-		/*
-		printf("[0x%8x 0x%8x] (%.3f %.3f %.3f) %.3f\n",
-			  data.header, data.footer,
-			  data.ahrs.x, data.ahrs.y, data.ahrs.z,
-			  data.ahrs.w);
-		*/
-
-		if (data.header == 0x01020304 && data.footer == 0xa7f32249) {
-			worker_data.ahrs = data.ahrs;
-		}
-	}
-}
 
 void app_main(void) {
 	page = GyroZeroBias;
@@ -299,16 +283,12 @@ void app_main(void) {
 
 	ESP_ERROR_CHECK(BleGamePad.begin(device));
 
-#if M5STICK
-	I2CMaster *i2c = new I2CMaster(&M5Stick_Internal);
-#elif M5STACK
-	I2CMaster *i2c = new I2CMaster(&M5Stack_Internal);
-#endif
+	I2CMaster *i2c = new I2CMaster(&M5Stick_Grove);
 
 	// BluetoothはCore0
 	xTaskCreatePinnedToCore(ble_send_task, "hid_task", 2048, nullptr, 5, nullptr, 0);
 
-	IIMU *imu = new MPU6886(i2c);
+	IIMU *imu = new LSM9DS1(i2c, 0);
 	xTaskCreatePinnedToCore(ahrs_task, "ahrs", 1024 * 4, imu, 10, nullptr, 1);
 
 	gpio_config_t button;
@@ -320,7 +300,4 @@ void app_main(void) {
 	ESP_ERROR_CHECK(gpio_config(&button));
 
 	xTaskCreatePinnedToCore(lcd_task, "lcd", 1024 * 8, nullptr, 10, NULL, 0);
-#if GAMEPAD_COUNT > 1
-	xTaskCreatePinnedToCore(parent_task, "parent", 1024 * 4, nullptr, 10, NULL, 0);
-#endif
 }

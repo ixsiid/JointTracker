@@ -84,6 +84,8 @@ class MPU6886 : public IIMU {
 	void calibrateZeroBias(uint8_t count, int32_t accel_threshould, int32_t gyro_threshould);
 	void updateAhrs(Quaternion* result);
 
+	void * getI2CMaster();
+
     private:
 	float accel_resolution, gyro_resolution;
 	AccelScale accel_scale;
@@ -92,6 +94,8 @@ class MPU6886 : public IIMU {
 	void getGyroResolution();
 	I2CMaster* i2c;
 };
+
+inline void * MPU6886::getI2CMaster() { return i2c; }
 
 MPU6886::MPU6886(I2CMaster* i2c) {
 	gyro_scale = GFS_2000DPS;

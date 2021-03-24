@@ -10,12 +10,12 @@ class IIMU {
 	virtual Vector3<float> getAccel()	    = 0;
 	virtual Vector3<int16_t> getGyroAdc()  = 0;
 	virtual Vector3<float> getGyro()	    = 0;
-
-	virtual int16_t getTemp()						   = 0;
-	virtual int16_t getTempAndGyroAdc(Vector3<int16_t>* gyro) = 0;
-
-	virtual int16_t getData(Vector3<int16_t>* accel, Vector3<int16_t>* gyro) = 0;
+	virtual Vector3<int16_t> getMagAdc()   = 0;
+	virtual Vector3<float> getMag()	    = 0;
 
 	virtual void getAccelAdc(Vector3<int16_t>* accel) = 0;
 	virtual void getGyroAdc(Vector3<int16_t>* gyro)	= 0;
+	virtual void getMagAdc(Vector3<int16_t>* mag)	= 0;
+
+	virtual void* getI2CMaster() = 0;
 };

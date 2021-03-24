@@ -1,16 +1,16 @@
-#include "MadgwickAHRS.h"
+#include "MadgwickAHRSInt.h"
 
 #include <esp_timer.h>
 #include <fastmath.h>
 
-MadgwickAHRS::MadgwickAHRS(float beta) {
+MadgwickAHRSInt::MadgwickAHRSInt(float beta) {
 	this->beta = beta;
 
 	reset();
 	time = esp_timer_get_time();
 }
 
-void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a, Vector3<float> m) {
+void MadgwickAHRSInt::update(Vector3<int16_t> g, Vector3<int16_t> a, Vector3<int16_t> m) {
 	float anorm = a.Dot2();
 	float mnorm = m.Dot2();
 	if (anorm < 0.002f || mnorm < 0.0002f) return;
@@ -21,7 +21,6 @@ void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a, Vector3<float> m) 
 
 	norm = 1.0f / sqrt(mnorm);
 	m *= norm;
-
 
 	// 再利用変数の初期化
 	float ww	= q.w * q.w;
@@ -77,7 +76,6 @@ void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a, Vector3<float> m) 
 	int64_t t		    = esp_timer_get_time();
 	float samplePeriod = (t - time) / 1000000.0f;
 	time			    = t;
-	
 	// Integrate to yield quaternion
 	q.w += qDotw * samplePeriod;
 	q.x += qDotx * samplePeriod;
@@ -91,7 +89,53 @@ void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a, Vector3<float> m) 
 	q.z = q.z * norm;
 }
 
-void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a) {
+inline int32_t GetMsbPos(int32_t uVal) 
+{ 
+	// https://jp.quora.com/%E6%9C%80%E4%B8%8A%E4%BD%8D%E3%83%93%E3%83%83%E3%83%88-MSB-%E3%81%AE%E4%BD%8D%E7%BD%AE%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%99%E3%82%8B%E5%8A%B9%E6%9E%9C%E7%9A%84%E3%81%AA%E6%96%B9%E6%B3%95%E3%81%AF%E3%81%82%E3%82%8A
+	/* Propagates the MSB to all the lower bits. */ 
+	uVal |= (uVal >> 1); 
+	uVal |= (uVal >> 2); 
+	uVal |= (uVal >> 4); 
+	uVal |= (uVal >> 8); 
+	uVal |= (uVal >>16); 
+ 
+	/* Counts 1-bits. */ 
+	uVal = (uVal & 0x55555555) + ((uVal >> 1) & 0x55555555); /*uVal<=2*/ 
+	uVal = (uVal & 0x33333333) + ((uVal >> 2) & 0x33333333); /*uVal<=4*/ 
+	uVal = (uVal & 0x0F0F0F0F) + ((uVal >> 4) & 0x0F0F0F0F); 
+	uVal = (uVal             ) + ((uVal >> 8)); 
+	uVal = (uVal             ) + ((uVal >>16)); 
+ 
+	return (uVal & 0x1F) - 1; 
+}
+
+inline int32_t sqrtint(int32_t value) {
+	// https://itchyny.hatenablog.com/entry/20101222/1293028538
+	int32_t msb = GetMsbPos(value);
+
+	int32_t a = 0, c = 0, y = 0, x = value;
+	for (int i = msb + (msb & 1); i; i-= 2) {
+		c = (y << 1 | 1) <= x >> i;
+		a = a << 1 | c;
+		y = y << 1 | c;
+		x -= c * y << i;
+		y += c;
+	}
+	return a;
+}
+
+void MadgwickAHRSInt::update(Vector3<int16_t> g, Vector3<int16_t> a) {
+	// 内部はint32で処理する、入出力はint16で処理される
+	int32_t t;
+	int32_t norm = 0;
+	t = a.x;
+	norm += t * t;
+	t = a.y;
+	norm += t * t;
+	t = a.z;
+	norm += t * t;
+
+/*
 	// Normalise accelerometer measurement
 	float norm = sqrtf(a.Dot2());
 	if (norm <= 0.002f) return;  // handle NaN
@@ -104,9 +148,12 @@ void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a) {
 
 	// Auxiliary variables to avoid repeated arithmetic
 	Quaternion qq = q.Dot(q);
+	// max: 0x7fff * 0x7fff = 3fff0001 ( *2 / 10000 + 1)
+	// 3fff * 3fff = fff8001
 
 	float qqxy = qq.x + qq.y;
 	float qqwz = qq.w + qq.z;
+	// 1fff0002
 
 	// Gradient decent algorithm corrective step
 	Quaternion s = {
@@ -127,9 +174,10 @@ void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a) {
 	// Integrate to yield quaternion
 	q += qdot * dt;
 	q.normalize(true);
+	*/
 }
 
-void MadgwickAHRS::reset() {
+void MadgwickAHRSInt::reset() {
 	IAHRS::reset();
 	time = esp_timer_get_time();
 }

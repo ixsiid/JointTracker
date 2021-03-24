@@ -13,31 +13,31 @@ struct wire_s {
 	uint32_t i2c_speed;
 };
 
-static const wire_s Default_M5Atom = {
+static const wire_s M5Atom_Internal = {
     .i2cnum	= (i2c_port_t)0,
     .io_scl	= (gpio_num_t)21,
     .io_sda	= (gpio_num_t)25,
     .i2c_speed = 400000};
 
-static const wire_s Default_M5Stick = {
-    .i2cnum	= (i2c_port_t)0,
-    .io_scl	= (gpio_num_t)22,
-    .io_sda	= (gpio_num_t)21,
-    .i2c_speed = 1000000};
-
-static const wire_s Default_M5Stack = {
+static const wire_s M5Stick_Internal = {
     .i2cnum	= (i2c_port_t)0,
     .io_scl	= (gpio_num_t)22,
     .io_sda	= (gpio_num_t)21,
     .i2c_speed = 400000};
 
-static const wire_s Grove_M5Stick = {
+static const wire_s M5Stack_Internal = {
+    .i2cnum	= (i2c_port_t)0,
+    .io_scl	= (gpio_num_t)22,
+    .io_sda	= (gpio_num_t)21,
+    .i2c_speed = 400000};
+
+static const wire_s M5Stick_Grove = {
     .i2cnum	= (i2c_port_t)1,
     .io_scl	= (gpio_num_t)33,
     .io_sda	= (gpio_num_t)32,
     .i2c_speed = 400000};
 
-static const wire_s Grove_M5Atom = {
+static const wire_s M5Atom_Grove = {
     .i2cnum	= (i2c_port_t)1,
     .io_scl	= (gpio_num_t)32,
     .io_sda	= (gpio_num_t)26,

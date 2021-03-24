@@ -29,11 +29,12 @@ class Calibration {
 
 	void getGyroAdc(Vector3<int32_t> *value);
 	void getAccelAdc(Vector3<int32_t> *value);
+	void getMagAdc(Vector3<int32_t> *value);
 
 	void getGyroAdcWithCalibrate(Vector3<int32_t> *value);
 
 	void getData(Vector3<int32_t> *accel, Vector3<int32_t> *gyro);
-	Vector3<int32_t> a, g;
+	Vector3<int32_t> a, g, m;
 	Vector3<int32_t> gyro_a, gyro_b;
 
     private:
@@ -60,6 +61,7 @@ Calibration::Calibration(IIMU *imu, int count, uint32_t gyro_threshould, uint32_
 
 	a = {0, 0, 0};
 	g = {0, 0, 0};
+	m = {0, 0, 0};
 
 	this->count = 0;
 	this->mode  = Mode::None;
@@ -79,11 +81,13 @@ Calibration::Calibration(IIMU *imu, temper_chara_t chara) {
 	this->mode = Mode::None;
 }
 
+/*
 void Calibration::calcOffsetByTemperCharacteristics() {
 	int32_t temper = sensor->getTemp();
 
 	g = (gyro_a * temper + gyro_b) / 0x10000;
 }
+*/
 
 void Calibration::regist(Mode mode) {
 	this->mode = mode;
@@ -114,6 +118,9 @@ bool Calibration::proccess() {
 
 		count = 0;
 		if (mode & Mode::Gyro) {
+			printf("dm: %d, sum: [%d, %d, %d]\n", dm, sum.x, sum.y, sum.z);
+			printf("max: [%d, %d, %d]\n", max.x, max.y, max.z);
+			printf("min: [%d, %d, %d]\n", min.x, min.y, min.z);
 			if (dm < gyro_threshould) {
 				g = -sum / count_limit;
 
@@ -205,6 +212,15 @@ void Calibration::getAccelAdc(Vector3<int32_t> *value) {
 	value->x = a.x + accel.x;
 	value->y = a.y + accel.y;
 	value->z = a.z + accel.z;
+}
+
+void Calibration::getMagAdc(Vector3<int32_t> *value) {
+	Vector3<int16_t> mag;
+	sensor->getAccelAdc(&mag);
+
+	value->x = m.x + mag.x;
+	value->y = m.y + mag.y;
+	value->z = m.z + mag.z;
 }
 
 void Calibration::getData(Vector3<int32_t> *accel, Vector3<int32_t> *gyro) {
