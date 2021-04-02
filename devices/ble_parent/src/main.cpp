@@ -53,10 +53,6 @@ void ble_send_task(void *arg) {
 
 	int i = 0;
 	while (true) {
-		if (++i == 20) {
-			i = 0;
-			printf("%d, %p\n", BleGamePad.connected, ahrs);
-		}
 		vTaskDelay(10 / portTICK_PERIOD_MS);
 		if (BleGamePad.connected && ahrs != nullptr) {
 			pad[0].rx	    = ahrs->q.x * 32767.0f;

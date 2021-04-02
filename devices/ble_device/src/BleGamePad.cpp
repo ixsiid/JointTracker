@@ -10,9 +10,9 @@
 #define TAG "BLE_GAMEPAD"
 
 uint16_t BleGamePadClass::hid_conn_id = 0;
-bool BleGamePadClass::connected = false;
+bool BleGamePadClass::connected	   = false;
 
-char BleGamePadClass::device[32] = {0};
+char BleGamePadClass::device[32]  = {0};
 bool BleGamePadClass::initialized = false;
 
 const uint8_t BleGamePadClass::hidd_service_uuid128[16] = {
@@ -116,14 +116,14 @@ esp_err_t BleGamePadClass::begin(const char *device_name) {
 	if (initialized) return ESP_OK;
 	initialized = true;
 
-	for (int i=0; i<31; i++) {
+	for (int i = 0; i < 31; i++) {
 		device[i] = device_name[i];
 		if (device[i] == '\0') break;
 	}
 	device[31] = '\0';
 
 	esp_err_t err;
-	
+
 	// Initialize NVS.
 	err = nvs_flash_init();
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -189,6 +189,10 @@ esp_err_t BleGamePadClass::begin(const char *device_name) {
 	esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
 
 	return ESP_OK;
+}
+
+void BleGamePadClass::send(gamepad_u *pad, int index) {
+	esp_hidd_send_gamepad_value(hid_conn_id, index + 1, pad->raw, sizeof(gamepad_t));
 }
 
 void BleGamePadClass::send0(gamepad_u *pad) {

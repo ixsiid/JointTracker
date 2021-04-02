@@ -27,6 +27,8 @@ union gamepad_u {
 class BleGamePadClass {
     public:
 	static esp_err_t begin(const char *device_name);
+	static void send(gamepad_t *pad, int index = 0);
+
 	static void send0(gamepad_t *pad);
 #if GAMEPAD_COUNT > 1
 	static void send1(gamepad_t *pad);
@@ -45,6 +47,7 @@ class BleGamePadClass {
 	static void send1(gamepad_u *pad);
 	static void send2(gamepad_u *pad);
 	static void send3(gamepad_u *pad);
+	static void send(gamepad_u *pad, int index);
 	static char device[32];
 
 	static uint16_t hid_conn_id;
@@ -54,6 +57,8 @@ class BleGamePadClass {
 	static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
 	static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 };
+
+inline void BleGamePadClass::send(gamepad_t *pad, int index) { send((gamepad_u *)pad, index); }
 
 inline void BleGamePadClass::send0(gamepad_t *pad) { send0((gamepad_u *)pad); }
 #if GAMEPAD_COUNT > 1
