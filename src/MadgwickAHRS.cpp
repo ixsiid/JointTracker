@@ -22,6 +22,9 @@ void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a, Vector3<float> m) 
 	norm = 1.0f / sqrt(mnorm);
 	m *= norm;
 
+	int64_t t = esp_timer_get_time();
+	float dt	= (t - time) / 1000000.0f;
+	time		= t;
 
 	// 再利用変数の初期化
 	float ww	= q.w * q.w;
@@ -57,38 +60,23 @@ void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a, Vector3<float> m) 
 	float _4bz = 2.0f * _2bz;
 
 	// Gradient decent algorithm corrective step
-	float s1 = -_2y * (2.0f * xz - _2wy - a.x) + _2x * (2.0f * wx + _2yz - a.y) - _2bz * q.y * (_2bx * (0.5f - yy - zz) + _2bz * (xz - wy) - m.x) + (-_2bx * q.z + _2bz * q.x) * (_2bx * (xy - wz) + _2bz * (wx + yz) - m.y) + _2bx * q.y * (_2bx * (wy + xz) + _2bz * (0.5f - xx - yy) - m.z);
-	float s2 = +_2z * (2.0f * xz - _2wy - a.x) + _2w * (2.0f * wx + _2yz - a.y) - 4.0f * q.x * (1 - 2.0f * xx - 2.0f * yy - a.z) + _2bz * q.z * (_2bx * (0.5f - yy - zz) + _2bz * (xz - wy) - m.x) + (_2bx * q.y + _2bz * q.w) * (_2bx * (xy - wz) + _2bz * (wx + yz) - m.y) + (_2bx * q.z - _4bz * q.x) * (_2bx * (wy + xz) + _2bz * (0.5f - xx - yy) - m.z);
-	float s3 = -_2w * (2.0f * xz - _2wy - a.x) + _2z * (2.0f * wx + _2yz - a.y) - 4.0f * q.y * (1 - 2.0f * xx - 2.0f * yy - a.z) + (-_4bx * q.y - _2bz * q.w) * (_2bx * (0.5f - yy - zz) + _2bz * (xz - wy) - m.x) + (_2bx * q.x + _2bz * q.z) * (_2bx * (xy - wz) + _2bz * (wx + yz) - m.y) + (_2bx * q.w - _4bz * q.y) * (_2bx * (wy + xz) + _2bz * (0.5f - xx - yy) - m.z);
-	float s4 = +_2x * (2.0f * xz - _2wy - a.x) + _2y * (2.0f * wx + _2yz - a.y) + (-_4bx * q.z + _2bz * q.x) * (_2bx * (0.5f - yy - zz) + _2bz * (xz - wy) - m.x) + (-_2bx * q.w + _2bz * q.y) * (_2bx * (xy - wz) + _2bz * (wx + yz) - m.y) + _2bx * q.x * (_2bx * (wy + xz) + _2bz * (0.5f - xx - yy) - m.z);
-
-	norm = 1.0f / sqrt(s1 * s1 + s2 * s2 + s3 * s3 + s4 * s4);	// normalise step m
-	s1 *= norm;
-	s2 *= norm;
-	s3 *= norm;
-	s4 *= norm;
+	Quaternion s = {+_2z * (2.0f * xz - _2wy - a.x) + _2w * (2.0f * wx + _2yz - a.y) - 4.0f * q.x * (1 - 2.0f * xx - 2.0f * yy - a.z) + _2bz * q.z * (_2bx * (0.5f - yy - zz) + _2bz * (xz - wy) - m.x) + (_2bx * q.y + _2bz * q.w) * (_2bx * (xy - wz) + _2bz * (wx + yz) - m.y) + (_2bx * q.z - _4bz * q.x) * (_2bx * (wy + xz) + _2bz * (0.5f - xx - yy) - m.z),
+				 -_2w * (2.0f * xz - _2wy - a.x) + _2z * (2.0f * wx + _2yz - a.y) - 4.0f * q.y * (1 - 2.0f * xx - 2.0f * yy - a.z) + (-_4bx * q.y - _2bz * q.w) * (_2bx * (0.5f - yy - zz) + _2bz * (xz - wy) - m.x) + (_2bx * q.x + _2bz * q.z) * (_2bx * (xy - wz) + _2bz * (wx + yz) - m.y) + (_2bx * q.w - _4bz * q.y) * (_2bx * (wy + xz) + _2bz * (0.5f - xx - yy) - m.z),
+				 +_2x * (2.0f * xz - _2wy - a.x) + _2y * (2.0f * wx + _2yz - a.y) + (-_4bx * q.z + _2bz * q.x) * (_2bx * (0.5f - yy - zz) + _2bz * (xz - wy) - m.x) + (-_2bx * q.w + _2bz * q.y) * (_2bx * (xy - wz) + _2bz * (wx + yz) - m.y) + _2bx * q.x * (_2bx * (wy + xz) + _2bz * (0.5f - xx - yy) - m.z),
+				 -_2y * (2.0f * xz - _2wy - a.x) + _2x * (2.0f * wx + _2yz - a.y) - _2bz * q.y * (_2bx * (0.5f - yy - zz) + _2bz * (xz - wy) - m.x) + (-_2bx * q.z + _2bz * q.x) * (_2bx * (xy - wz) + _2bz * (wx + yz) - m.y) + _2bx * q.y * (_2bx * (wy + xz) + _2bz * (0.5f - xx - yy) - m.z)};
+	s.normalize();
 
 	// Compute rate of change of quaternion
-	float qDotw = 0.5f * (-q.x * g.x - q.y * g.y - q.z * g.z) - beta * s1;
-	float qDotx = 0.5f * (+q.w * g.x + q.y * g.z - q.z * g.y) - beta * s2;
-	float qDoty = 0.5f * (+q.w * g.y - q.x * g.z + q.z * g.x) - beta * s3;
-	float qDotz = 0.5f * (+q.w * g.z + q.x * g.y - q.y * g.x) - beta * s4;
+	Quaternion qdot = {+q.w * g.x + q.y * g.z - q.z * g.y,
+				    +q.w * g.y - q.x * g.z + q.z * g.x,
+				    +q.w * g.z + q.x * g.y - q.y * g.x,
+				    -q.x * g.x - q.y * g.y - q.z * g.z};
 
-	int64_t t		    = esp_timer_get_time();
-	float samplePeriod = (t - time) / 1000000.0f;
-	time			    = t;
-	
+	qdot = qdot * 0.5f - s * beta;
+
 	// Integrate to yield quaternion
-	q.w += qDotw * samplePeriod;
-	q.x += qDotx * samplePeriod;
-	q.y += qDoty * samplePeriod;
-	q.z += qDotz * samplePeriod;
-	norm = 1.0f / sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
-
-	q.w = q.w * norm;
-	q.x = q.x * norm;
-	q.y = q.y * norm;
-	q.z = q.z * norm;
+	q += qdot * dt;
+	q.normalize(true);
 }
 
 void MadgwickAHRS::update(Vector3<float> g, Vector3<float> a) {

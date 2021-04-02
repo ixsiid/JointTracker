@@ -216,7 +216,7 @@ void Calibration::getAccelAdc(Vector3<int32_t> *value) {
 
 void Calibration::getMagAdc(Vector3<int32_t> *value) {
 	Vector3<int16_t> mag;
-	sensor->getAccelAdc(&mag);
+	sensor->getMagAdc(&mag);
 
 	value->x = m.x + mag.x;
 	value->y = m.y + mag.y;

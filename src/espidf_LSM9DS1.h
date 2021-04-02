@@ -141,15 +141,15 @@ LSM9DS1::LSM9DS1(I2CMaster* i2c, uint8_t channel) {
 
 	/// Gyro configure
 	// ODR 952Hz, 2000 dps, Cutoff 33Hz ※HPF, LPF2は使わないのでCutoffは意味なし
-	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG1_G, 0b11011000);
+	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG1_G, 0b11011011);
 	vTaskDelay(10 / portTICK_PERIOD_MS);
 
 	// LPF2 disable
-	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG2_G, 0b00000000);
+	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG2_G, 0b00000001);
 	vTaskDelay(10 / portTICK_PERIOD_MS);
 
 	// Low power mode: disable, HPF: disable
-	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG3_G, 0b00000000);
+	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG3_G, 0b01001001);
 	vTaskDelay(10 / portTICK_PERIOD_MS);
 
 	//
@@ -196,8 +196,11 @@ LSM9DS1::LSM9DS1(I2CMaster* i2c, uint8_t channel) {
 	getAccelResolution();
 	getMagResolution();
 
+	uint8_t ag_status = i2c->read(LSM9DS1_ADDRESS_AG, STATUS_REG);
+	vTaskDelay(10 / portTICK_PERIOD_MS);
+	uint8_t m_status = i2c->read(LSM9DS1_ADDRESS_M, STATUS_REG_M);
 	// Check Available
-	printf("Status %x %x\n", i2c->read(LSM9DS1_ADDRESS_AG, STATUS_REG), i2c->read(LSM9DS1_ADDRESS_M, STATUS_REG_M));
+	printf("Status %x %x\n", ag_status, m_status);
 }
 
 void LSM9DS1::getGyroResolution() {
@@ -260,72 +263,33 @@ inline Vector3<float> LSM9DS1::getGyro() { return getGyroAdc() * gyro_resolution
 inline Vector3<float> LSM9DS1::getMag() { return getMagAdc() * mag_resolution; }
 
 Vector3<int16_t> LSM9DS1::getAccelAdc() {
-	uint8_t buffer[6] = {0};
-
-	i2c->read_bytes(LSM9DS1_ADDRESS_AG, LSM9DS1_OUT_X_XL, buffer, 6);
-
 	Vector3<int16_t> accel;
-	accel.x = ((int16_t)buffer[0] << 8) | buffer[1];
-	accel.y = ((int16_t)buffer[2] << 8) | buffer[3];
-	accel.z = ((int16_t)buffer[4] << 8) | buffer[5];
-
+	i2c->read_bytes(LSM9DS1_ADDRESS_AG, LSM9DS1_OUT_X_XL, (uint8_t *)&accel, 6);
 	return accel;
 }
 
 Vector3<int16_t> LSM9DS1::getGyroAdc() {
-	uint8_t buffer[6] = {0};
-
-	i2c->read_bytes(LSM9DS1_ADDRESS_AG, LSM9DS1_OUT_X_G, buffer, 6);
-
-	Vector3<int16_t> accel;
-	accel.x = ((int16_t)buffer[0] << 8) | buffer[1];
-	accel.y = ((int16_t)buffer[2] << 8) | buffer[3];
-	accel.z = ((int16_t)buffer[4] << 8) | buffer[5];
-
-	return accel;
+	Vector3<int16_t> gyro;
+	i2c->read_bytes(LSM9DS1_ADDRESS_AG, LSM9DS1_OUT_X_G, (uint8_t *)&gyro, 6);
+	return gyro;
 }
 
 Vector3<int16_t> LSM9DS1::getMagAdc() {
-	uint8_t buffer[6] = {0};
-
-	i2c->read_bytes(LSM9DS1_ADDRESS_M, LSM9DS1_OUT_X_L_M, buffer, 6);
-
 	Vector3<int16_t> mag;
-	mag.x = ((int16_t)buffer[0] << 8) | buffer[1];
-	mag.y = ((int16_t)buffer[2] << 8) | buffer[3];
-	mag.z = ((int16_t)buffer[4] << 8) | buffer[5];
-
+	i2c->read_bytes(LSM9DS1_ADDRESS_M, LSM9DS1_OUT_X_L_M, (uint8_t *)&mag, 6);
 	return mag;
 }
 
 void LSM9DS1::getAccelAdc(Vector3<int16_t>* accel) {
-	uint8_t buffer[6];
-
-	i2c->read_bytes(LSM9DS1_ADDRESS_AG, LSM9DS1_OUT_X_XL, buffer, 6);
-
-	accel->x = ((int16_t)buffer[0] << 8) | buffer[1];
-	accel->y = ((int16_t)buffer[2] << 8) | buffer[3];
-	accel->z = ((int16_t)buffer[4] << 8) | buffer[5];
+	i2c->read_bytes(LSM9DS1_ADDRESS_AG, LSM9DS1_OUT_X_XL, (uint8_t *)accel, 6);
 }
 
 void LSM9DS1::getGyroAdc(Vector3<int16_t>* gyro) {
-	uint8_t buffer[6];
-
-	i2c->read_bytes(LSM9DS1_ADDRESS_AG, LSM9DS1_OUT_X_G, buffer, 6);
-
-	gyro->x = ((int16_t)buffer[0] << 8) | buffer[1];
-	gyro->y = ((int16_t)buffer[2] << 8) | buffer[3];
-	gyro->z = ((int16_t)buffer[4] << 8) | buffer[5];
+	i2c->read_bytes(LSM9DS1_ADDRESS_AG, LSM9DS1_OUT_X_G, (uint8_t*)gyro, 6);
 }
 
 void LSM9DS1::getMagAdc(Vector3<int16_t>* mag) {
-	uint8_t buffer[6];
-
-	i2c->read_bytes(LSM9DS1_ADDRESS_M, LSM9DS1_OUT_X_L_M, buffer, 6);
-
-	mag->x = ((int16_t)buffer[0] << 8) | buffer[1];
-	mag->y = ((int16_t)buffer[2] << 8) | buffer[3];
-	mag->z = ((int16_t)buffer[4] << 8) | buffer[5];
+	i2c->read_bytes(LSM9DS1_ADDRESS_M, LSM9DS1_OUT_X_L_M, (uint8_t *)mag, 6);
 }
 
 }  // namespace ESPIDF
