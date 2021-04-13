@@ -218,6 +218,20 @@ struct Quaternion {
 		w += value.w;
 	}
 
+	void operator *=(float value) {
+		x *= value;
+		y *= value;
+		z *= value;
+		w *= value;
+	}
+
+	void operator -=(Quaternion value) {
+		x -= value.x;
+		y -= value.y;
+		z -= value.z;
+		w -= value.w;
+	}
+
 	Quaternion operator*(Quaternion p) {
 		// https://www.mss.co.jp/technology/report/pdf/18-07.pdf
 		// 資料は [w, x, y, z] の順番なので注意

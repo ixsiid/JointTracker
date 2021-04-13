@@ -145,11 +145,11 @@ LSM9DS1::LSM9DS1(I2CMaster* i2c, uint8_t channel) {
 	vTaskDelay(10 / portTICK_PERIOD_MS);
 
 	// LPF2 disable
-	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG2_G, 0b00000001);
+	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG2_G, 0b00000000);
 	vTaskDelay(10 / portTICK_PERIOD_MS);
 
 	// Low power mode: disable, HPF: disable
-	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG3_G, 0b01001001);
+	i2c->write(LSM9DS1_ADDRESS_AG, LSM9DS1_CTRL_REG3_G, 0b00000000);
 	vTaskDelay(10 / portTICK_PERIOD_MS);
 
 	//
@@ -171,7 +171,7 @@ LSM9DS1::LSM9DS1(I2CMaster* i2c, uint8_t channel) {
 
 	/// Magnetic sensor configure
 	// Temperature compensation enabled, XY ultra high performance mode, ODR 80Hz, fast odr, no self-test
-	i2c->write(LSM9DS1_ADDRESS_M, LSM9DS1_CTRL_REG1_M, 0b01111100);
+	i2c->write(LSM9DS1_ADDRESS_M, LSM9DS1_CTRL_REG1_M, 0b11111100);
 	vTaskDelay(10 / portTICK_PERIOD_MS);
 
 	// ±4Gauss,

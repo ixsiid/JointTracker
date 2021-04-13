@@ -50,6 +50,7 @@ const esp_ble_adv_params_t BleGamePadClass::hidd_adv_params = {
 void BleGamePadClass::hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param) {
 	switch (event) {
 		case ESP_HIDD_EVENT_REG_FINISH: {
+			ESP_LOGI(TAG, "ESP_HIDD_EVENT_REG_FINISH");
 			if (param->init_finish.state == ESP_HIDD_INIT_OK) {
 				//esp_bd_addr_t rand_addr = {0x04,0x11,0x11,0x11,0x11,0x05};
 				esp_ble_gap_set_device_name(device);
@@ -58,9 +59,11 @@ void BleGamePadClass::hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb
 			break;
 		}
 		case ESP_BAT_EVENT_REG: {
+			ESP_LOGI(TAG, "ESP_BAT_EVENT_REG");
 			break;
 		}
 		case ESP_HIDD_EVENT_DEINIT_FINISH:
+			ESP_LOGI(TAG, "ESP_HIDD_EVENT_DEINIT_FINISH");
 			break;
 		case ESP_HIDD_EVENT_BLE_CONNECT: {
 			ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
@@ -78,6 +81,7 @@ void BleGamePadClass::hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb
 			ESP_LOG_BUFFER_HEX(TAG, param->vendor_write.data, param->vendor_write.length);
 		}
 		default:
+			ESP_LOGI(TAG, "ESP_HIDD_EVENT_UNCAUGHT_CALLBACK: %d", event);
 			break;
 	}
 	return;
@@ -86,16 +90,18 @@ void BleGamePadClass::hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb
 void BleGamePadClass::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
 	switch (event) {
 		case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+			ESP_LOGI(TAG, "ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT");
 			esp_ble_gap_start_advertising((esp_ble_adv_params_t *)&hidd_adv_params);
 			break;
 		case ESP_GAP_BLE_SEC_REQ_EVT:
+			ESP_LOGI(TAG, "ESP_GAP_BLE_SEC_REQ_EVT");
 			for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
 				ESP_LOGD(TAG, "%x:", param->ble_security.ble_req.bd_addr[i]);
 			}
 			esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
 			break;
 		case ESP_GAP_BLE_AUTH_CMPL_EVT:
-			connected = true;
+			ESP_LOGI(TAG, "ESP_GAP_BLE_AUTH_CMPL_EVT");
 			esp_bd_addr_t bd_addr;
 			memcpy(bd_addr, param->ble_security.auth_cmpl.bd_addr, sizeof(esp_bd_addr_t));
 			ESP_LOGI(TAG, "remote BD_ADDR: %08x%04x",
@@ -106,8 +112,11 @@ void BleGamePadClass::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_ga
 			if (!param->ble_security.auth_cmpl.success) {
 				ESP_LOGE(TAG, "fail reason = 0x%x", param->ble_security.auth_cmpl.fail_reason);
 			}
+			
+			connected = true;
 			break;
 		default:
+			ESP_LOGI(TAG, "ESP_GAP_EVENT_UNCAUGHT: %d", event);
 			break;
 	}
 }

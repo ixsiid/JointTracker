@@ -49,11 +49,15 @@ void app_main();
 static MadgwickAHRS **ahrs_list;
 static IIMU **imu_list;
 
-uint8_t battery_voltage[IMU_COUNT];
+uint8_t battery_voltage[2];
+float magni[IMU_COUNT];
+float acce[IMU_COUNT];
+
+Vector3<float> _m[IMU_COUNT];
+float b[4] = {0};
 
 void ble_send_task(void *arg) {
 	gamepad_t pad[IMU_COUNT];
-	vTaskDelay(1000 / portTICK_PERIOD_MS);
 
 	for (int i = 0; i < 2; i++) {
 		pad[i].x = pad[i].y = pad[i].z = 0;
@@ -64,16 +68,21 @@ void ble_send_task(void *arg) {
 	}
 
 	while (true) {
-		for (int i = 0; i < IMU_COUNT; i++) {
-			IAHRS *ahrs = ahrs_list[i];
-			vTaskDelay(10 / portTICK_PERIOD_MS);
-			if (BleGamePad.connected && ahrs != nullptr) {
+		while (!BleGamePad.connected) vTaskDelay(1000 / portTICK_PERIOD_MS);
+		vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+		int i = 0;
+		IAHRS * ahrs;
+		while(BleGamePad.connected) {
+			if ((ahrs = ahrs_list[i]) != nullptr) {
 				pad[i].rx	    = ahrs->q.x * 32767.0f;
 				pad[i].ry	    = ahrs->q.y * 32767.0f;
 				pad[i].rz	    = ahrs->q.z * 32767.0f;
 				pad[i].slider = ahrs->q.w * 32767.0f;
 				BleGamePad.send(&pad[i], i);
 			}
+			vTaskDelay(30 / portTICK_PERIOD_MS);
+			if ((++i) >= IMU_COUNT) i = 0;
 		}
 	}
 }
@@ -146,7 +155,7 @@ void lcd_task(void *arg) {
 
 #ifdef CALCULATE_PROCESS_PER_SECOND
 	int _pps = 0;
-	char buf[16];
+	char buf[24];
 #endif
 
 	while (true) {
@@ -184,6 +193,27 @@ void lcd_task(void *arg) {
 		if (_pps != pps) {
 			sprintf(buf, "%d", _pps = pps);
 			lcd.drawString(buf, 5, 120);
+
+			for(int i=0; i<IMU_COUNT; i++) {
+				sprintf(buf, "%f", magni[i]);
+				lcd.drawString(buf, 10, 140 + i * 63);
+				sprintf(buf, "%f", acce[i]);
+				lcd.drawString(buf, 10, 151 + i * 63);
+
+
+
+				sprintf(buf, "%+1.3f", b[0]);
+				lcd.drawString(buf, 0, 164);
+
+				sprintf(buf, "%+1.3f", b[1]);
+				lcd.drawString(buf, 0, 174);
+
+				sprintf(buf, "%+1.3f", b[2]);
+				lcd.drawString(buf, 0, 184);
+
+				sprintf(buf, "%+1.3f", b[3]);
+				lcd.drawString(buf, 0, 194);
+			}
 		}
 #endif
 
@@ -194,26 +224,21 @@ void lcd_task(void *arg) {
 
 void ahrs_task(void *arg) {
 	vTaskDelay(1000 / portTICK_RATE_MS);
-
 	ESPIDF::I2CMaster *i2c = (ESPIDF::I2CMaster *)arg;
 
 	Calibration **calib = new Calibration*[IMU_COUNT];
 	for (int i = 0; i < IMU_COUNT; i++) {
 		calib[i] = new Calibration(imu_list[i], 128);
-		ahrs_list[i]	    = new MadgwickAHRS(1.0f);
 
+		ahrs_list[i] = new MadgwickAHRS(1.0f);
 		ahrs_list[i]->reset();
 	}
 
-	// Gyro scale (±2000 degree/seconds Range by int16_t data -> rad / seconds)
-	// (1.0f / 32768.0f * 2000.0f / 180.0f * 3.14159265358979323846264338327950288f);
-	const float s = 0.00106526443603169529841533860372f;
 
-	// Accelemeter scale (± 8G Range by int16_t data -> m/s^2)
-	const float t = 8.0 / 32768.0;
-
-	// Magnetic scale (± 4Gauss by int16_t data -> gauss)
-	const float u = 4.0 / 32768.0;
+	// LSM9DS1のデータシートp12 	Module Specification に分解能の記載があり
+	const float s = 0.001 * 70.0 / 180.0 * 3.14159265358979323846264338327950288;
+	const float t = 8.0 / 32768.0; // = 0.001f * 0.244f;
+	const float u = 0.001 * 0.14;
 
 	Vector3<int32_t> a, g, m;
 
@@ -248,6 +273,21 @@ void ahrs_task(void *arg) {
 			pps	 = proc;
 			start = now;
 			proc	 = 0;
+
+			Vector3<int32_t> mm;
+			for(int i=0; i<IMU_COUNT; i++) {
+				calib[i]->getMagAdc(&mm);
+				magni[i] = sqrtf((mm * u).Dot2());
+				_m[i] = mm * u;
+
+				calib[i]->getAccelAdc(&mm);
+				acce[i] = sqrtf((mm * t).Dot2());
+
+				b[0] = calib[i]->b[0];
+				b[1] = calib[i]->b[1];
+				b[2] = calib[i]->b[2];
+				b[3] = calib[i]->b[3];
+			}
 		}
 #endif
 
@@ -255,7 +295,17 @@ void ahrs_task(void *arg) {
 		calib[device_index]->getGyroAdc(&g);
 		calib[device_index]->getMagAdc(&m);
 
-		ahrs_list[device_index]->update(g * s, a * t, m * u);
+		Vector3<float> mmm = m * u;
+		mmm -= {
+			0.065f,
+			0.294f,
+			0.072f};
+		mmm /= 0.327f;
+
+		mmm.x = -mmm.x;
+
+		ahrs_list[device_index]->update(g * -s, a * t, mmm);
+
 
 		if (++device_index >= IMU_COUNT) device_index = 0;
 	}

@@ -36,6 +36,8 @@ class Calibration {
 	void getData(Vector3<int32_t> *accel, Vector3<int32_t> *gyro);
 	Vector3<int32_t> a, g, m;
 	Vector3<int32_t> gyro_a, gyro_b;
+	
+	float b[4];
 
     private:
 	void calcOffsetByTemperCharacteristics();
@@ -62,6 +64,9 @@ Calibration::Calibration(IIMU *imu, int count, uint32_t gyro_threshould, uint32_
 	a = {0, 0, 0};
 	g = {0, 0, 0};
 	m = {0, 0, 0};
+	
+	b[0] = b[1] = b[2] = 0.0f;
+	b[3] = 1.0f;
 
 	this->count = 0;
 	this->mode  = Mode::None;
@@ -193,9 +198,9 @@ void Calibration::getGyroAdcWithCalibrate(Vector3<int32_t> *value) {
 	int32_t dm = (max - min).Dot2();
 
 	if (dm < gyro_threshould) {
-//		printf("Calibrate: [%d, %d, %d] -> ", g.x, g.y, g.z);
+		//		printf("Calibrate: [%d, %d, %d] -> ", g.x, g.y, g.z);
 		g = -sum / count_limit;
-//		printf("[%d, %d, %d]\n", g.x, g.y, g.z);
+		//		printf("[%d, %d, %d]\n", g.x, g.y, g.z);
 	}
 
 	count++;
@@ -217,6 +222,18 @@ void Calibration::getAccelAdc(Vector3<int32_t> *value) {
 void Calibration::getMagAdc(Vector3<int32_t> *value) {
 	Vector3<int16_t> mag;
 	sensor->getMagAdc(&mag);
+
+	const float k = 0.001 * 0.14;
+	const float lr = 0.1f;
+	Vector3<float> m = mag * k;
+	float dx = m.x - b[0];
+	float dy = m.y - b[1];
+	float dz = m.z - b[2];
+	float f = dx * dx + dy * dy + dz * dz - b[3] * b[3];
+	b[0] += 4.0f * lr * f * dx;
+	b[1] += 4.0f * lr * f * dy;
+	b[2] += 4.0f * lr * f * dz;
+	b[3] += 4.0f * lr * f * b[3];
 
 	value->x = m.x + mag.x;
 	value->y = m.y + mag.y;
